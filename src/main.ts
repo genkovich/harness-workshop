@@ -1,4 +1,4 @@
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { runAgent } from './harness.ts';
 
 const task = process.argv[2]?.trim();
@@ -11,7 +11,7 @@ try {
   const result = await runAgent(
     {
       system: 'Відповідай українською.',
-      model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+      model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
     },
     task,
   );

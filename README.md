@@ -2,7 +2,7 @@
 
 **Ця гілка:** `step-03-function` — результат етапу 03.
 
-[Усі ранбуки](runbooks/README.md) · [Підготовка та пакети](runbooks/00-start.md) · [Тести](test/harness.test.mjs).
+[Усі ранбуки](runbooks/README.md) · [Підготовка](runbooks/00-start.md) · [Тести](test/harness.test.mjs).
 
 Конфігурація, залежності, тести та .env.example готові. npm ci створює .env, якщо його немає; ключ вставляємо перед заняттям. На практиці змінюємо лише src/.
 
@@ -10,7 +10,7 @@
 
 ## Що будуємо
 
-Агент шукає обговорення про harness engineering і coding agents на Hacker News, читає коментарі та зберігає стислий український дайджест у .data/digest.md. Три предметні тули: searchStories, readDiscussion, saveDigest. HN Search працює без ключів; потрібен лише ключ моделі OpenRouter.
+Агент шукає обговорення про harness engineering і coding agents на Hacker News, читає коментарі та зберігає стислий український дайджест у .data/digest.md. Три предметні тули: searchStories, readDiscussion, saveDigest. HN Search працює без ключів; потрібен лише ключ моделі Groq.
 
 Кроки наростають: запит → описи → виконання → історія → цикл → контекст → skill digest → дозвіл на запис. Читання повертає по 10 коментарів із nextOffset; результати з посиланнями, довгі коментарі позначені як обрізані. Це огляд вибраних обговорень, зовнішні статті не завантажуємо.
 
@@ -23,7 +23,7 @@ npm ci
 git switch -c work-01
 ```
 
-Потрібен Node.js 26 Current (перевірено 26.9.0). Відкрий [детальну підготовку для Windows, macOS і Linux](runbooks/00-start.md): встановлення, доступ до GitHub, безкоштовний OpenRouter та перевірка npm run setup:check. Поповнення балансу не потрібне.
+Потрібен Node.js 26 Current (перевірено 26.9.0). Відкрий [підготовку до заняття](runbooks/00-start.md): встановлення, доступ до GitHub, Groq Free та перевірка npm run setup:check. Поповнення балансу не потрібне.
 
 ## Перевірити цю контрольну точку
 
