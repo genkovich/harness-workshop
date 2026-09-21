@@ -11,4 +11,4 @@
 `sendReply` пише в локальний `.data/outbox.jsonl`. Клієнт 42 і списання вигадані.
 Локальна демонстрація використовує симулятор моделі; запити SDK, цикл і робота з файлами справжні.
 
-[День 2](day2/RUNBOOK.md) · [Перевірки й межі демо](docs/VERIFICATION.md) · [Для лектора](docs/INSTRUCTOR.md)
+[День 2](https://github.com/genkovich/harness-workshop/blob/day2-flue/day2/RUNBOOK.md) · [Перевірки й межі демо](docs/VERIFICATION.md) · [Для лектора](docs/INSTRUCTOR.md)
