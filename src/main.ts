@@ -1,11 +1,15 @@
-import { generateText } from 'ai';
+import { generateText, type ModelMessage } from 'ai';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 
 const model = openrouter('openai/gpt-oss-20b');
 
+const task = process.argv[2] || 'Перевір списання клієнта 42.';
+const messages: ModelMessage[] = [{ role: 'user', content: task }];
+
 const reply = await generateText({
   model,
-  prompt: 'Привітайся українською одним реченням.',
+  system: 'Відповідай українською.',
+  messages,
   maxRetries: 0,
   maxOutputTokens: 1200,
   abortSignal: AbortSignal.timeout(60_000),

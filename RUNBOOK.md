@@ -1,33 +1,31 @@
-# 01. Один запит
+# 02. Повідомлення
 
-Почни з власного коду після етапу 00. Змінюй лише `src/`. Контрольна точка після виконання: `step-01-model`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 01. Змінюй лише `src/`. Контрольна точка після виконання: `step-02-messages`. Тести й конфігурація вже готові.
 
-У `src/main.ts` прибери початковий console.log. Додавай ці три фрагменти по черзі в той самий файл.
+У `src/main.ts` додай ModelMessage до імпорту з ai:
 
 ```ts
-import { generateText } from 'ai';
-import { openrouter } from '@openrouter/ai-sdk-provider';
-
-const model = openrouter('openai/gpt-oss-20b');
+import { generateText, type ModelMessage } from 'ai';
 ```
 
-Нижче зроби один запит:
+Після const model додай задачу та початкове повідомлення:
 
 ```ts
-const reply = await generateText({
-  model,
-  prompt: 'Привітайся українською одним реченням.',
-  maxRetries: 0,
-  maxOutputTokens: 1200,
-  abortSignal: AbortSignal.timeout(60_000),
-});
+const task = process.argv[2] || 'Перевір списання клієнта 42.';
+const messages: ModelMessage[] = [{ role: 'user', content: task }];
 ```
 
-Наприкінці покажи результат:
+У generateText прибери поле prompt. На його місце встав:
 
 ```ts
-console.log('Причина завершення:', reply.finishReason);
-console.log('Відповідь:', reply.text);
+system: 'Відповідай українською.',
+messages,
+```
+
+Перед викликом моделі можеш подивитися, що передаєш:
+
+```ts
+console.log('Повідомлення:', messages);
 ```
 
 ## Запусти й перевір
@@ -39,17 +37,17 @@ npm start
 
 **Поки перевіряємо типи та живий запуск.**
 
-**Очікуємо:** Причина завершення й текст привітання. Це перший запит до OpenRouter.
+**Очікуємо:** Одна задача user і відповідь моделі. Тулів ще немає; текст про списання не означає, що дані перевірені.
 
-**Якщо не так:** 401 — перевір ключ у підготовленому .env. 402 — баланс ключа. 429 — прочитай відповідь сервера й зачекай. length — збільш maxOutputTokens до 2400 у src/main.ts та повтори; обрізану відповідь не вважай успіхом.
+**Якщо не так:** Якщо тип role не підходить, звір ModelMessage[]. Власну задачу передай через npm start -- "Твоя задача".
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 01: Один запит"
+git commit -m "Етап 02: Повідомлення"
 ```
 
-Далі відкрий [етап 02 у браузері](https://github.com/genkovich/harness-workshop/blob/step-02-messages/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Далі відкрий [етап 03 у браузері](https://github.com/genkovich/harness-workshop/blob/step-03-function/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
 
