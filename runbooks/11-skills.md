@@ -1,20 +1,20 @@
-# 11. Skills
+# 11. Інструкції на вимогу: skills
 
 [Усі теми](README.md) · [Попередня](10-context.md) · [Наступна](12-guard.md)
 
-**Перед початком:** код після `step-10-context`. **Результат теми:** `step-11-skills`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-10-context`. **Результат теми:** `step-11-skills`. Змінюємо лише `src/`.
 
 ## Що робимо й навіщо
 
-Спочатку передаємо лише описи skills. Повна інструкція потрапляє в історію після readSkill: так потрібні деталі додаються на вимогу.
+Skill — окрема інструкція для певного завдання. Спочатку передаємо моделі лише короткі описи доступних інструкцій. Повна інструкція потрапляє в історію після readSkill: так потрібні деталі додаються на вимогу.
 
 ## Чого бракує зараз і що зміниться
 
-Довгі інструкції не завжди потрібні для кожної задачі. Спочатку показуємо короткий опис, щоб модель могла обрати потрібну інструкцію, а повний текст повертаємо після запиту readSkill.
+Довгі інструкції не завжди потрібні для кожного завдання. Спочатку показуємо короткий опис, щоб модель могла обрати потрібну інструкцію, а повний текст повертаємо після запиту readSkill.
 
 - descriptions — каталог доступних інструкцій. Сам повний текст спочатку залишається у нашій програмі.
 - readSkill шукає відоме імʼя в каталозі; модель не отримує довільне читання файлів за шляхом.
-- Новий тул використовує вже готовий цикл: його результат так само повертається через messages.
+- Новий інструмент використовує вже готовий цикл: його результат так само повертається через messages.
 - Після зміни порівнюємо два запити: до readSkill є опис, після нього — повна інструкція.
 
 ## Маленькі зміни
@@ -31,7 +31,7 @@ const directory = new URL('../skills/', import.meta.url);
 
 Вираз `/^description: (.+)$/m` шукає рядок `description:` у Markdown. `m` дозволяє шукати початок і кінець кожного рядка; `.exec(text)?.[1]` дістає текст після двокрапки або `undefined`, якщо збігу немає. Це просте читання одного рядка, не повний YAML-парсер.
 
-Нижче склади список skills. Повний текст читаємо з диска вже зараз, але **моделі його ще не передаємо**:
+Нижче склади каталог інструкцій. Повний текст читаємо з диска вже зараз, але **моделі його ще не передаємо**:
 
 ```ts
 export const skills = readdirSync(directory)
@@ -39,7 +39,9 @@ export const skills = readdirSync(directory)
   .map(name => {
     const text = readFileSync(new URL(`${name}/SKILL.md`, directory), 'utf8');
     const description = /^description: (.+)$/m.exec(text)?.[1];
-    if (!description) throw new Error(`Немає description у skill ${name}`);
+    if (!description) {
+      throw new Error(`Немає description у skill ${name}`);
+    }
     return { name, description, text };
   });
 ```
@@ -51,7 +53,9 @@ export const skills = readdirSync(directory)
 ```ts
 export function readSkill(name: string) {
   const skill = skills.find(skill => skill.name === name);
-  if (!skill) throw new Error(`Невідомий skill: ${name}`);
+  if (!skill) {
+    throw new Error(`Невідомий skill: ${name}`);
+  }
   return skill.text;
 }
 ```
@@ -61,11 +65,13 @@ export function readSkill(name: string) {
 ```ts
 import { skills, readSkill } from '../skills.ts';
 
-const skillInput = z.object({ name: z.string() });
+const skillInput = z.object({
+  name: z.string(),
+});
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 ```
 
-`descriptions` склеює лише імена та короткі описи через перенос рядка. Це підказка моделі, яку інструкцію можна попросити через `readSkill`. Повний `text` повертається в tool result тільки після вибору skill — так працює поступове додавання контексту в цій практиці.
+`descriptions` обʼєднує лише імена та короткі описи через перенос рядка. Це підказка моделі, яку інструкцію можна попросити через `readSkill`. Повний `text` повертається в результаті інструмента тільки після вибору skill — так працює поступове додавання контексту в цій практиці.
 
 Заміни context: rules на:
 
@@ -101,7 +107,7 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Автоматична перевірка:** 28 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Спочатку модель бачить опис; після readSkill — повний текст у tool result.
+**Очікуємо:** спочатку модель бачить опис; після readSkill — повний текст у результаті інструмента.
 
 **Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя digest, не шлях. Для живої перевірки попроси явно прочитати skill digest.
 
@@ -113,7 +119,7 @@ git diff --cached
 git commit -m "Етап 11: Skills"
 ```
 
-## Якщо не встиг: готова точка й наступна тема
+## Якщо не встиг: готова гілка й наступна тема
 
 Ця гілка містить **результат теми 11**. Збережи свою спробу й створи робочу гілку від готового коду:
 
@@ -151,7 +157,9 @@ export const skills = readdirSync(directory)
     const text = readFileSync(file, 'utf8');
     const description = /^description: (.+)$/m.exec(text)?.[1];
 
-    if (!description) throw new Error(`Немає description у skill ${name}`);
+    if (!description) {
+      throw new Error(`Немає description у skill ${name}`);
+    }
 
     return { name, description, text };
   });
@@ -159,7 +167,9 @@ export const skills = readdirSync(directory)
 export function readSkill(name: string) {
   // Обираємо зі знайдених skills, а не відкриваємо шлях від моделі.
   const skill = skills.find((skill) => skill.name === name);
-  if (!skill) throw new Error(`Невідомий skill: ${name}`);
+  if (!skill) {
+    throw new Error(`Невідомий skill: ${name}`);
+  }
   return skill.text;
 }
 ```
@@ -178,16 +188,26 @@ import { searchStories, readDiscussion } from './api.ts';
 import { readFileSync } from 'node:fs';
 import { skills, readSkill } from '../skills.ts';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
-const skillInput = z.object({ name: z.string() });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
+const skillInput = z.object({
+  name: z.string(),
+});
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
