@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { ModelMessage } from 'ai';
 import { callModel } from './model.ts';
 import { tools, runTool } from './tools.ts';
@@ -6,7 +7,8 @@ export const MAX_STEPS = 10;
 export function beforeTool(_call: Call): string | null { return null; }
 
 export async function runAgent(task: string, log: Log, model: ModelCall = callModel, maxSteps = MAX_STEPS) {
-  const messages: ModelMessage[] = [{ role: 'user', content: task }];
+  const rules = readFileSync('AGENTS.md', 'utf8');
+  const messages: ModelMessage[] = [{ role: 'user', content: `${rules}\n\n${task}` }];
   for (let step = 1; step <= maxSteps; step++) {
     const reply = await model(messages, tools, log, step);
     if (reply.calls.length === 0) {

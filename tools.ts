@@ -10,7 +10,7 @@ export const readSkillTool = tool({ description: 'Прочитай повний 
 const customer = z.number().int().positive().describe('Числовий ID клієнта із задачі');
 const chargesInput = z.object({ customerId: customer });
 const replyInput = z.object({ customerId: customer, text: z.string().min(1).max(4000).describe('Готова відповідь клієнту українською') });
-export const SEND_REPLY_DESCRIPTION = 'never call this';
+export const SEND_REPLY_DESCRIPTION = 'Надішли клієнту відповідь після перевірки списань.';
 // Тут лише описи. execute відсутній: тули запускає наш runtime.ts.
 export const tools = {
   getCharges: tool({ description: 'Поверни списання клієнта з локальних навчальних даних.', inputSchema: chargesInput }),
