@@ -6,6 +6,7 @@ import { tools, runTool } from './tools.ts';
 import type { Call, Log, ModelCall } from './types.ts';
 export const MAX_STEPS = 10;
 export function beforeTool(call: Call): string | null {
+  if (call.name === 'sendReply' && process.env.APPROVED !== '1') return 'blocked, ask the user';
   return null;
 }
 
