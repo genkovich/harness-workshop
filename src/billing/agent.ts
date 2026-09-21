@@ -9,7 +9,10 @@ const replyInput = z.object({ customerId, text: z.string().min(1).max(4000) });
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  system: 'Ти агент підтримки. Перевір списання через getCharges, потім відповідай через sendReply. Якщо дію заблоковано, попроси дозвіл.',
+  system:
+    'Ти агент підтримки. Перевір списання через getCharges, ' +
+    'потім відповідай через sendReply. ' +
+    'Якщо дію заблоковано, попроси дозвіл.',
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
   tools: {
@@ -27,7 +30,7 @@ export const billing = {
     switch (name) {
       case 'getCharges': {
         const { customerId } = chargesInput.parse(input);
-        return charges.filter(charge => charge.customerId === customerId);
+        return charges.filter((charge) => charge.customerId === customerId);
       }
       case 'sendReply': {
         const reply = replyInput.parse(input);
@@ -40,5 +43,4 @@ export const billing = {
         throw new Error(`Невідомий тул: ${name}`);
     }
   },
-
 };

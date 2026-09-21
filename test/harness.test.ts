@@ -13,7 +13,10 @@ type Reply = Awaited<ReturnType<MockLanguageModelV3['doGenerate']>>;
 function reply(content: Reply['content']): Reply {
   return {
     content,
-    finishReason: { unified: content.some(c => c.type === 'tool-call') ? 'tool-calls' : 'stop', raw: '' },
+    finishReason: {
+      unified: content.some((c) => c.type === 'tool-call') ? 'tool-calls' : 'stop',
+      raw: '',
+    },
     usage: {
       inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 },
       outputTokens: { total: 0, text: 0, reasoning: 0 },
@@ -24,7 +27,10 @@ function reply(content: Reply['content']): Reply {
 
 const final = reply([{ type: 'text', text: 'Готово.' }]);
 const call = (name: string, input: unknown, id = 'call_1'): Reply['content'][number] => ({
-  type: 'tool-call', toolCallId: id, toolName: name, input: JSON.stringify(input),
+  type: 'tool-call',
+  toolCallId: id,
+  toolName: name,
+  input: JSON.stringify(input),
 });
 
 test('Текстова відповідь завершує роботу після одного запиту', async () => {
@@ -36,4 +42,3 @@ test('Текстова відповідь завершує роботу післ
   assert.equal(model.doGenerateCalls.length, 1);
   assert.equal(model.doGenerateCalls[0].prompt.at(-1)?.role, 'user');
 });
-
