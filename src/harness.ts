@@ -6,6 +6,11 @@ import {
   type JSONValue,
 } from 'ai';
 
+const maxOutputTokens = 512;
+const modelTimeoutMs = 60_000;
+
+const defaultMaxSteps = 10;
+
 export type Agent = {
   model: LanguageModel;
   system: string;
@@ -17,7 +22,7 @@ export type Agent = {
 export async function runAgent(agent: Agent, task: string) {
   const messages: ModelMessage[] = [{ role: 'user', content: task }];
 
-  for (let step = 1; step <= (agent.maxSteps ?? 10); step++) {
+  for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
 
     const reply = await generateText({
@@ -26,8 +31,8 @@ export async function runAgent(agent: Agent, task: string) {
       messages,
       tools: agent.tools,
       maxRetries: 0,
-      maxOutputTokens: 1200,
-      abortSignal: AbortSignal.timeout(60_000),
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(modelTimeoutMs),
       include: { requestBody: true },
     });
 
