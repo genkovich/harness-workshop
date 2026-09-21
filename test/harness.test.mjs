@@ -1,8 +1,11 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { MockLanguageModelV3 } from "ai/test";
 mock.method(console, "log", () => {
 });
@@ -28,47 +31,47 @@ function reply(content) {
     warnings: []
   };
 }
-const final = reply([{ type: "text", text: "\u0413\u043E\u0442\u043E\u0432\u043E." }]);
+const final = reply([{ type: "text", text: "Готово." }]);
 const call = (name, input, id = "call_1") => ({
   type: "tool-call",
   toolCallId: id,
   toolName: name,
   input: JSON.stringify(input)
 });
-test("01 \u0417\u0430\u043F\u0438\u0442: \u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0437\u0430\u0432\u0435\u0440\u0448\u0443\u0454 \u0440\u043E\u0431\u043E\u0442\u0443 \u043F\u0456\u0441\u043B\u044F \u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0438\u0442\u0443", async () => {
+test("03 Запит: Текстова відповідь завершує роботу після одного запиту", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
-  const result = await runAgent({ model, system: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0439 \u0443\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u043E\u044E." }, "\u041F\u0440\u0438\u0432\u0456\u0442");
-  assert.equal(result.text, "\u0413\u043E\u0442\u043E\u0432\u043E.");
+  const result = await runAgent({ model, system: "Відповідай українською." }, "Привіт");
+  assert.equal(result.text, "Готово.");
   assert.equal(result.reason, "final");
   assert.equal(model.doGenerateCalls.length, 1);
   assert.equal(model.doGenerateCalls[0].prompt.at(-1)?.role, "user");
 });
-test("02 \u041E\u043F\u0438\u0441\u0438: \u043C\u043E\u0434\u0435\u043B\u044C \u043E\u0442\u0440\u0438\u043C\u0443\u0454 \u0441\u0445\u0435\u043C\u0443 getCharges", async () => {
+test("05 Описи: модель отримує схему getCharges", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: [reply([call("getCharges", { customerId: 42 })]), final]
   });
-  await runAgent(await agent({ model }), "\u041F\u0435\u0440\u0435\u0432\u0456\u0440");
+  await runAgent(await agent({ model }), "Перевір");
   const tool = model.doGenerateCalls[0].tools.find((tool2) => tool2.name === "getCharges");
   assert.ok(tool);
   assert.equal(tool.inputSchema.properties.customerId.type, "integer");
 });
-test("03 \u0412\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F: getCharges \u0447\u0438\u0442\u0430\u0454 \u0434\u0430\u043D\u0456, \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C\u0441\u044F", async () => {
+test("06 Виконання: getCharges читає дані, аргументи перевіряються", async () => {
   const { billing } = await import("../src/billing/agent.ts");
   const charges = await billing.runTool("getCharges", { customerId: 42 });
   assert.deepEqual(charges.map((charge) => charge.id), ["ch_01", "ch_02"]);
   await assert.rejects(() => billing.runTool("getCharges", { customerId: "42" }));
 });
-test("04 \u0406\u0441\u0442\u043E\u0440\u0456\u044F: \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u043E\u0432\u0435\u0440\u0442\u0430\u0454\u0442\u044C\u0441\u044F \u0437 id \u0432\u0438\u043A\u043B\u0438\u043A\u0443", async () => {
+test("07 Історія: результат повертається з id виклику", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: [reply([call("getCharges", { customerId: 42 }, "id-42")]), final]
   });
-  const result = await runAgent(await agent({ model }), "\u041F\u0435\u0440\u0435\u0432\u0456\u0440");
+  const result = await runAgent(await agent({ model }), "Перевір");
   const message = result.messages.find((message2) => message2.role === "tool");
   assert.ok(message);
   assert.equal(message.content[0].toolCallId, "id-42");
   assert.match(JSON.stringify(message), /ch_02/);
 });
-test("05 \u0426\u0438\u043A\u043B: \u0414\u0432\u0430 \u0442\u0443\u043B\u0438: \u0456\u0441\u0442\u043E\u0440\u0456\u044F 1 \u2192 3 \u2192 5, \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u0430 \u0440\u0456\u0432\u043D\u043E \u043E\u0434\u0438\u043D \u0440\u0430\u0437", async (t) => {
+test("08 Цикл: Два тули: історія 1 → 3 → 5, відповідь записана рівно один раз", async (t) => {
   const originalDirectory = process.cwd();
   const directory = await mkdtemp(join(tmpdir(), "harness-"));
   process.chdir(directory);
@@ -77,14 +80,14 @@ test("05 \u0426\u0438\u043A\u043B: \u0414\u0432\u0430 \u0442\u0443\u043B\u0438: 
     doGenerate: [
       reply([call("getCharges", { customerId: 42 })]),
       reply([
-        call("sendReply", { customerId: 42, text: "\u0414\u0432\u0430 \u0441\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u043F\u043E $49." }, "call_2")
+        call("sendReply", { customerId: 42, text: "Два списання по $49." }, "call_2")
       ]),
       final
     ]
   });
   const result = await runAgent(
     await agent({ model, beforeTool: () => null }),
-    "\u041F\u0435\u0440\u0435\u0432\u0456\u0440 \u0441\u043F\u0438\u0441\u0430\u043D\u043D\u044F"
+    "Перевір списання"
   );
   assert.equal(result.reason, "final");
   const histories = model.doGenerateCalls.map(
@@ -99,7 +102,7 @@ test("05 \u0426\u0438\u043A\u043B: \u0414\u0432\u0430 \u0442\u0443\u043B\u0438: 
   assert.equal(lines.length, 1);
   assert.equal(JSON.parse(lines[0]).customerId, 42);
 });
-test("06 \u041A\u0456\u043B\u044C\u043A\u0430 \u0442\u0443\u043B\u0456\u0432: \u041A\u0456\u043B\u044C\u043A\u0430 \u0432\u0438\u043A\u043B\u0438\u043A\u0456\u0432 \u043E\u0442\u0440\u0438\u043C\u0443\u044E\u0442\u044C \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u0438 \u0437\u0456 \u0441\u0432\u043E\u0457\u043C\u0438 id", async () => {
+test("08 Кілька тулів: Кілька викликів отримують результати зі своїми id", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: [
       reply([
@@ -109,7 +112,7 @@ test("06 \u041A\u0456\u043B\u044C\u043A\u0430 \u0442\u0443\u043B\u0456\u0432: \u
       final
     ]
   });
-  await runAgent(await agent({ model }), "\u0414\u0432\u0430 \u043A\u043B\u0456\u0454\u043D\u0442\u0438");
+  await runAgent(await agent({ model }), "Два клієнти");
   const results = model.doGenerateCalls[1].prompt.filter(
     (message) => message.role === "tool"
   );
@@ -120,43 +123,46 @@ test("06 \u041A\u0456\u043B\u044C\u043A\u0430 \u0442\u0443\u043B\u0456\u0432: \u
     ["a", "b"]
   );
 });
-test("07 \u041B\u0456\u043C\u0456\u0442: \u041B\u0456\u043C\u0456\u0442 \u0437\u0443\u043F\u0438\u043D\u044F\u0454 \u043C\u043E\u0434\u0435\u043B\u044C, \u044F\u043A\u0430 \u0437\u043D\u043E\u0432\u0443 \u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0442\u043E\u0439 \u0441\u0430\u043C\u0438\u0439 \u0442\u0443\u043B", async () => {
+test("08 Ліміт: Ліміт зупиняє модель, яка знову просить той самий тул", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: reply([call("getCharges", { customerId: 42 })])
   });
-  const result = await runAgent(await agent({ model, maxSteps: 2 }), "\u041F\u043E\u0432\u0442\u043E\u0440\u044E\u0439");
+  const result = await runAgent(await agent({ model, maxSteps: 2 }), "Повторюй");
   assert.equal(result.reason, "limit");
   assert.equal(model.doGenerateCalls.length, 2);
 });
-test("08 \u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0456 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u0438 \u0439 \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0438\u0439 \u0442\u0443\u043B \u043F\u043E\u0432\u0435\u0440\u0442\u0430\u044E\u0442\u044C \u043F\u043E\u043C\u0438\u043B\u043A\u0443 \u0432 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442", async () => {
+test("08 Помилка: Некоректні аргументи й невідомий тул повертають помилку в контекст", async () => {
   for (const toolCall of [
     call("getCharges", { customerId: "42" }),
     call("unknown", {})
   ]) {
     const model = new MockLanguageModelV3({ doGenerate: [reply([toolCall]), final] });
-    await runAgent(await agent({ model }), "\u041D\u0435\u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0438\u0439 \u0432\u0438\u043A\u043B\u0438\u043A");
+    await runAgent(await agent({ model }), "Некоректний виклик");
     const next = model.doGenerateCalls[1].prompt;
     assert.equal(next.filter((message) => message.role === "tool").length, 1);
     const nextRequest = JSON.stringify(next);
     assert.match(nextRequest, /error/);
   }
 });
-test("09 \u041E\u0431\u0440\u0456\u0437\u0430\u043D\u043D\u044F: \u041E\u0431\u0440\u0456\u0437\u0430\u043D\u0456 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u0438 \u043D\u0435 \u0434\u043E\u0445\u043E\u0434\u044F\u0442\u044C \u0434\u043E \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F", async () => {
+test("08 Обрізання: Обрізані аргументи не доходять до виконання", async () => {
   const truncated = reply([call("getCharges", { customerId: 42 })]);
   truncated.finishReason = { unified: "length", raw: "length" };
   const model = new MockLanguageModelV3({ doGenerate: truncated });
-  await assert.rejects(async () => runAgent(await agent({ model }), "\u041F\u0435\u0440\u0435\u0432\u0456\u0440"), /обрізано/);
+  let executed = false;
+  const options = await agent({ model, runTool: async () => { executed = true; return {}; } });
+  await assert.rejects(() => runAgent(options, "Перевір"), /обрізано/);
+  assert.equal(executed, false);
 });
-test("10 \u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442: AGENTS.md \u0437\u02BC\u044F\u0432\u043B\u044F\u0454\u0442\u044C\u0441\u044F \u0432 \u043F\u0435\u0440\u0448\u043E\u043C\u0443 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u0456", async () => {
+test("10 Контекст: AGENTS.md зʼявляється в першому повідомленні", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
-  await runAgent(await agent({ model }), "\u041F\u0435\u0440\u0435\u0432\u0456\u0440");
+  await runAgent(await agent({ model }), "Перевір");
   assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Дякуємо за звернення/);
 });
-test("11 Skills: \u0421\u043F\u0435\u0440\u0448\u0443 \u043E\u043F\u0438\u0441 skill, \u043F\u043E\u0432\u043D\u0438\u0439 \u0442\u0435\u043A\u0441\u0442 \u043B\u0438\u0448\u0435 \u043F\u0456\u0441\u043B\u044F readSkill", async () => {
+test("11 Skills: Спершу опис skill, повний текст лише після readSkill", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: [reply([call("readSkill", { name: "billing" })]), final]
   });
-  await runAgent(await agent({ model }), "\u041F\u0440\u043E\u0447\u0438\u0442\u0430\u0439 billing");
+  await runAgent(await agent({ model }), "Прочитай billing");
   assert.doesNotMatch(
     JSON.stringify(model.doGenerateCalls[0].prompt),
     /Перевір дати, суми/
@@ -165,7 +171,7 @@ test("11 Skills: \u0421\u043F\u0435\u0440\u0448\u0443 \u043E\u043F\u0438\u0441 s
   const { readSkill } = await import("../src/skills.ts");
   assert.throws(() => readSkill("../../.env"), /Невідомий skill/);
 });
-test("12 \u0414\u043E\u0437\u0432\u0456\u043B: \u0411\u0435\u0437 \u0434\u043E\u0437\u0432\u043E\u043B\u0443 sendReply \u043D\u0435 \u0441\u0442\u0432\u043E\u0440\u044E\u0454 outbox, \u043C\u043E\u0434\u0435\u043B\u044C \u0431\u0430\u0447\u0438\u0442\u044C \u0431\u043B\u043E\u043A\u0443\u0432\u0430\u043D\u043D\u044F", async (t) => {
+test("12 Дозвіл: Без дозволу sendReply не створює outbox, модель бачить блокування", async (t) => {
   const originalDirectory = process.cwd();
   const approved = process.env.APPROVED;
   process.chdir(await mkdtemp(join(tmpdir(), "harness-blocked-")));
@@ -177,11 +183,126 @@ test("12 \u0414\u043E\u0437\u0432\u0456\u043B: \u0411\u0435\u0437 \u0434\u043E\u
   });
   const model = new MockLanguageModelV3({
     doGenerate: [
-      reply([call("sendReply", { customerId: 42, text: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C" })]),
+      reply([call("sendReply", { customerId: 42, text: "Відповідь" })]),
       final
     ]
   });
-  await runAgent(await agent({ model }), "\u041D\u0430\u0434\u0456\u0448\u043B\u0438");
+  await runAgent(await agent({ model }), "Надішли");
   await assert.rejects(() => readFile(".data/outbox.jsonl"), { code: "ENOENT" });
   assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /blocked, ask the user/);
+});
+
+// Перші етапи теж перевіряємо виконанням коду, а не пошуком рядків у src.
+const root = fileURLToPath(new URL('../', import.meta.url));
+
+async function runEntry(t, task) {
+  const temporary = await mkdtemp(join(tmpdir(), 'harness-entry-'));
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const capture = join(temporary, 'requests.jsonl');
+  const result = spawnSync(process.execPath, [
+    '--import', './test/openrouter.mock.mjs', '--import', 'tsx', 'src/main.ts', task,
+  ], {
+    cwd: root, encoding: 'utf8', timeout: 15_000,
+    env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key',
+      HARNESS_REQUESTS_PATH: capture, TRACE: '0', APPROVED: '0' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Тестова відповідь без мережі/);
+  const requests = (await readFile(capture, 'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(requests.length, 1);
+  return requests[0];
+}
+
+test('01 Модель: main.ts робить один справжній запит SDK із підміненим HTTP', async (t) => {
+  const request = await runEntry(t, 'Привіт');
+  assert.equal(request.model, 'openai/gpt-oss-20b');
+  assert.ok(request.messages.some(message => message.role === 'user'));
+});
+
+test('02 Повідомлення: задача з CLI потрапляє до user, правила до system', async (t) => {
+  const task = 'Унікальна задача перевірки CLI';
+  const request = await runEntry(t, task);
+  assert.ok(request.messages.some(message => message.role === 'system'));
+  const user = request.messages.find(message => message.role === 'user');
+  assert.ok(JSON.stringify(user.content).includes(task));
+});
+
+test('04 Описи: дві схеми перевіряють аргументи, execute не підключений', async () => {
+  const { billing } = await import('../src/billing/agent.ts');
+  const { getCharges, sendReply } = billing.tools;
+  assert.equal(getCharges.execute, undefined);
+  assert.equal(sendReply.execute, undefined);
+  assert.ok(getCharges.description.length > 0);
+  assert.ok(sendReply.description.length > 0);
+  assert.equal(getCharges.inputSchema.safeParse({ customerId: 42 }).success, true);
+  assert.equal(getCharges.inputSchema.safeParse({ customerId: '42' }).success, false);
+  assert.equal(sendReply.inputSchema.safeParse({ customerId: 42, text: '' }).success, false);
+});
+
+test('09 Description: змінений опис доходить до моделі, виконання лишається доступним', async (t) => {
+  const originalDirectory = process.cwd();
+  const temporary = await mkdtemp(join(tmpdir(), 'harness-description-'));
+  process.chdir(temporary);
+  t.after(async () => {
+    process.chdir(originalDirectory);
+    await rm(temporary, { recursive: true, force: true });
+  });
+  const { billing } = await import('../src/billing/agent.ts');
+  const model = new MockLanguageModelV3({ doGenerate: [
+    reply([call('sendReply', { customerId: 42, text: 'Перевірка опису' })]), final,
+  ] });
+  await runAgent(await agent({ model, beforeTool: () => null, tools: {
+    ...billing.tools, sendReply: { ...billing.tools.sendReply, description: 'never call this' },
+  } }), 'Перевір опис');
+  const sent = model.doGenerateCalls[0].tools.find(tool => tool.name === 'sendReply');
+  assert.equal(sent.description, 'never call this');
+  assert.equal(JSON.parse((await readFile('.data/outbox.jsonl', 'utf8')).trim()).customerId, 42);
+  // Це перевірка доставки опису й доступності функції, а не слухняності живої моделі.
+});
+
+test('08 OpenRouter: HTTP tool call повертається наступним запитом із тим самим id', async () => {
+  const requests = [];
+  const router = createOpenRouter({ apiKey: 'offline-test-key', fetch: async (url, options) => {
+    assert.equal(String(url), 'https://openrouter.ai/api/v1/chat/completions');
+    requests.push(JSON.parse(options.body));
+    const first = requests.length === 1;
+    return new Response(JSON.stringify({
+      id: 'offline', object: 'chat.completion', created: 1, model: 'openai/gpt-oss-20b',
+      choices: [{ index: 0, finish_reason: first ? 'tool_calls' : 'stop', message: first ? {
+        role: 'assistant', content: null, tool_calls: [{ id: 'router_1', type: 'function',
+          function: { name: 'getCharges', arguments: '{"customerId":42}' } }],
+      } : { role: 'assistant', content: 'Два списання.' } }],
+      usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+    }), { headers: { 'content-type': 'application/json' } });
+  } });
+  const result = await runAgent(await agent({ model: router('openai/gpt-oss-20b') }), 'Перевір 42');
+  assert.equal(result.reason, 'final');
+  assert.equal(result.text, 'Два списання.');
+  assert.equal(requests.length, 2);
+  assert.ok(requests[0].tools.some(tool => tool.function.name === 'getCharges'));
+  const toolResult = requests[1].messages.find(message => message.role === 'tool');
+  assert.equal(toolResult.tool_call_id, 'router_1');
+  assert.equal(JSON.parse(toolResult.content)[1].id, 'ch_02');
+});
+
+test('12 Дозвіл: APPROVED=1 дозволяє рівно один запис відповіді', async (t) => {
+  const originalDirectory = process.cwd();
+  const approved = process.env.APPROVED;
+  const temporary = await mkdtemp(join(tmpdir(), 'harness-approved-'));
+  process.chdir(temporary);
+  process.env.APPROVED = '1';
+  t.after(async () => {
+    process.chdir(originalDirectory);
+    if (approved === undefined) delete process.env.APPROVED;
+    else process.env.APPROVED = approved;
+    await rm(temporary, { recursive: true, force: true });
+  });
+  const model = new MockLanguageModelV3({ doGenerate: [
+    reply([call('sendReply', { customerId: 42, text: 'Дозволено' })]), final,
+  ] });
+  const result = await runAgent(await agent({ model }), 'Надішли');
+  assert.equal(result.reason, 'final');
+  const lines = (await readFile('.data/outbox.jsonl', 'utf8')).trim().split('\n');
+  assert.equal(lines.length, 1);
+  assert.equal(JSON.parse(lines[0]).text, 'Дозволено');
 });
