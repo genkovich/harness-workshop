@@ -1,92 +1,61 @@
-# 11. Skills
+# 12. Дозвіл
 
-Почни з власного коду після етапу 10. Змінюй лише `src/`. Контрольна точка після виконання: `step-11-skills`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 11. Змінюй лише `src/`. Контрольна точка після виконання: `step-12-guard`. Тести й конфігурація вже готові.
 
-skills/billing/SKILL.md уже лежить у заготовці. Створи src/skills.ts. Перший фрагмент:
+У billing у src/billing/agent.ts додай метод:
 
 ```ts
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-
-const directory = new URL('../skills/', import.meta.url);
+beforeTool(name: string) {
+  if (name === 'sendReply' && process.env.APPROVED !== '1') {
+    return 'blocked, ask the user';
+  }
+  return null;
+},
 ```
 
-Нижче склади список skills. Повний текст поки залишається в нашій програмі:
+У тип Agent у src/harness.ts додай:
 
 ```ts
-export const skills = readdirSync(directory)
-  .filter(name => existsSync(new URL(`${name}/SKILL.md`, directory)))
-  .map(name => {
-    const text = readFileSync(new URL(`${name}/SKILL.md`, directory), 'utf8');
-    const description = /^description: (.+)$/m.exec(text)?.[1];
-    if (!description) throw new Error(`Немає description у skill ${name}`);
-    return { name, description, text };
-  });
+beforeTool?: (name: string) => string | null;
 ```
 
-Додай функцію читання за іменем:
+У try перед agent.runTool встав:
 
 ```ts
-export function readSkill(name: string) {
-  const skill = skills.find(skill => skill.name === name);
-  if (!skill) throw new Error(`Невідомий skill: ${name}`);
-  return skill.text;
+const blocked = agent.beforeTool?.(call.toolName);
+if (blocked) {
+  throw new Error(blocked);
 }
 ```
 
-У src/billing/agent.ts додай імпорт і два значення поруч зі схемами:
+Порівняй два запуски без редагування .env:
 
-```ts
-import { skills, readSkill } from '../skills.ts';
-
-const skillInput = z.object({ name: z.string() });
-const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
-```
-
-Заміни context: rules на:
-
-```ts
-context: `${rules}\nSkills:\n${descriptions}`,
-```
-
-У billing.tools додай опис:
-
-```ts
-readSkill: tool({
-  description: 'Прочитай повну інструкцію потрібного skill.',
-  inputSchema: skillInput,
-}),
-```
-
-Перед default у runTool додай виконання:
-
-```ts
-case 'readSkill': {
-  const { name } = skillInput.parse(input);
-  return { text: readSkill(name) };
-}
+```bash
+APPROVED=0 npm start
+APPROVED=1 npm start
 ```
 
 ## Запусти й перевір
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[1-9]|1[01]) "
+npm test -- --test-name-pattern "."
 npm start
 ```
 
-**Тести:** 11 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
+**Тести:** 12 перевірок мають пройти.
 
-**Очікуємо:** Одинадцять тестів проходять. Спочатку модель бачить опис; після readSkill — повний текст у tool result.
+**Очікуємо:** Усі 12 тестів проходять. Без дозволу sendReply повертає blocked і не змінює outbox. Дозволений виклик додає рядок.
 
-**Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя billing, не шлях. Для живої перевірки попроси явно прочитати billing.
+**Якщо не так:** Файл змінився без дозволу — перевір місце beforeTool. Повторний запит моделі на заборонений тул ще не означає виконання дії.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 11: Skills"
+git commit -m "Етап 12: Дозвіл"
 ```
 
-Далі відкрий [етап 12 у браузері](https://github.com/genkovich/harness-workshop/blob/step-12-guard/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Цикл зібрано. Поясни за логом: хто обрав тул, хто виконав дію, як результат потрапив до моделі та чому виконання завершилося.
 

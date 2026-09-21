@@ -12,6 +12,7 @@ export type Agent = {
   tools: ToolSet;
   runTool: (name: string, input: unknown) => Promise<JSONValue>;
   context?: string;
+  beforeTool?: (name: string) => string | null;
   maxSteps?: number;
 };
 
@@ -62,7 +63,12 @@ export async function runAgent(agent: Agent, task: string) {
         if (call.invalid) {
           throw call.error;
         }
-        // Виконання відбувається в нашій програмі, а не в SDK.
+        const blocked = agent.beforeTool?.(call.toolName);
+        if (blocked) {
+          throw new Error(blocked);
+        }
+
+        // Виконання відбувається в нашій програмі, після перевірки дозволу.
         result = await agent.runTool(call.toolName, call.input);
       } catch (error) {
         // Помилка теж результат: модель отримає її в наступному запиті.

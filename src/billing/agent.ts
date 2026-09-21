@@ -59,4 +59,11 @@ export const billing = {
         throw new Error(`Невідомий тул: ${name}`);
     }
   },
+
+  beforeTool(name: string) {
+    if (name === 'sendReply' && process.env.APPROVED !== '1') {
+      return 'blocked, ask the user';
+    }
+    return null;
+  },
 };
