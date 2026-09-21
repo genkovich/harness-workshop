@@ -1,7 +1,7 @@
 import { generateText } from 'ai';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 
-const model = openrouter('openai/gpt-oss-20b');
+const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free');
 
 const reply = await generateText({
   model,
