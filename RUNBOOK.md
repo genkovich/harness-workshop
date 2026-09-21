@@ -1,56 +1,55 @@
-# 07. Результат в історії
+# 08. Цикл і зупинка
 
-Почни з власного коду після етапу 06. Змінюй лише `src/`. Контрольна точка після виконання: `step-07-history`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 07. Змінюй лише `src/`. Контрольна точка після виконання: `step-08-loop`. Тести й конфігурація вже готові.
 
-У src/harness.ts перед for (const call...) додай повідомлення моделі:
+У тип Agent у src/harness.ts додай:
 
 ```ts
-messages.push(
-  ...reply.response.messages.filter(message => message.role === 'assistant'),
-);
+maxSteps?: number;
 ```
 
-Усередині for, після друку result, додай результат з тим самим id:
+Залиш створення messages перед циклом. Блок від generateText до виконання тулів обгорни в:
 
 ```ts
-messages.push({
-  role: 'tool',
-  content: [{
-    type: 'tool-result',
-    toolCallId: call.toolCallId,
-    toolName: call.toolName,
-    output: { type: 'json', value: result },
-  }],
-});
+for (let step = 1; step <= (agent.maxSteps ?? 10); step++) {
+  // Тут твій уже написаний запит, перевірка відповіді й тули.
+}
 ```
 
-Після for покажи стан історії:
+Коментар заміни наявним блоком. Прибери return tool-result і повідомлення, що повторного запиту ще немає. Return final залиш усередині if без tool calls. Після for додай:
 
 ```ts
-console.log('Повідомлень в історії:', messages.length);
+console.log('Зупинка: досягли ліміту кроків.');
+return { reason: 'limit', text: '', messages };
+```
+
+На початку кожного оберту покажи крок:
+
+```ts
+console.log(`Крок ${step}. Повідомлень у запиті: ${messages.length}.`);
 ```
 
 ## Запусти й перевір
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^0[1-4] "
+npm test -- --test-name-pattern "^0[1-9] "
 npm start
 ```
 
-**Тести:** 4 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
+**Тести:** 9 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
 
-**Очікуємо:** Чотири тести проходять. Після одного getCharges у messages три записи: user, assistant, tool. Повторного запиту ще немає.
+**Очікуємо:** Девʼять тестів проходять. Задана послідовність getCharges → sendReply → текст дає історію 1 → 3 → 5. Повторення й некоректні виклики також перевірені.
 
-**Якщо не так:** Звір toolCallId. Повідомлення assistant має стояти перед його tool result; одного console.log для передачі моделі недостатньо.
+**Якщо не так:** Завершується після тула — залишився return tool-result. Історія завжди 1 — messages опинився всередині for. Ліміт не означає виконану задачу.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 07: Результат в історії"
+git commit -m "Етап 08: Цикл і зупинка"
 ```
 
-Далі відкрий [етап 08 у браузері](https://github.com/genkovich/harness-workshop/blob/step-08-loop/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Далі відкрий [етап 09 у браузері](https://github.com/genkovich/harness-workshop/blob/step-09-description/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
 
