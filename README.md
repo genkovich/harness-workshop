@@ -17,7 +17,7 @@ npm ci
 git switch -c work-01
 ```
 
-Потрібен Node.js 24 LTS (перевірено 24.21.0). Відкрий [детальну підготовку для Windows, macOS і Linux](runbooks/00-start.md): встановлення, доступ до GitHub, безкоштовний OpenRouter та перевірка npm run setup:check. Поповнення балансу не потрібне.
+Потрібен Node.js 26 Current (перевірено 26.9.0). Відкрий [детальну підготовку для Windows, macOS і Linux](runbooks/00-start.md): встановлення, доступ до GitHub, безкоштовний OpenRouter та перевірка npm run setup:check. Поповнення балансу не потрібне.
 
 ## Перевірити цю контрольну точку
 
