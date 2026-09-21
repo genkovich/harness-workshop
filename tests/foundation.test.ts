@@ -29,3 +29,14 @@ test('невідомий тул і некоректні аргументи не 
 test('Retry-After: секунди, дата, відсутній заголовок',()=>{
  assert.equal(retryDelay('2'),2000);assert.equal(retryDelay('Thu, 01 Jan 1970 00:00:04 GMT',1000),3000);assert.equal(retryDelay(undefined),1000);
 });
+
+test('wire містить фактичні тіла HTTP, без заголовків авторизації', async () => {
+ const f=await fixture(); const events:Event[]=[];
+ try {
+  await callModel([{role:'user',content:'smoke'}],{},e=>events.push(e),1);
+  const wire=events.find(e=>e.event==='wire')!;
+  assert.deepEqual(JSON.parse(wire.request as string), f.requests[0]);
+  assert.ok(wire.response);
+  assert.ok(!JSON.stringify(wire).includes('local-demo-only'));
+ } finally { await f.close(); }
+});
