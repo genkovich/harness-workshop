@@ -15,18 +15,22 @@ export async function runAgent(task: string, log: Log, model: ModelCall = callMo
   const skillList = loadSkills().map(s => `${s.name}: ${s.description}`).join('\n');
   const messages: ModelMessage[] = [{ role: 'user', content: `${rules}\nSkills:\n${skillList}\n\n${task}` }];
   for (let step = 1; step <= maxSteps; step++) {
+    // Кожен оберт отримує всю поточну історію.
     const reply = await model(messages, tools, log, step);
     if (reply.calls.length === 0) {
       log({ event: 'stop', reason: 'final', step, text: reply.text });
       return { reason: 'final', text: reply.text };
     }
+    // Спершу записуємо запити моделі на тули.
     messages.push(...reply.messages);
     for (const call of reply.calls) {
+      // Перевірка дозволу відбувається до побічного ефекту.
       const blocked = beforeTool(call);
       let result;
       try { result = blocked ? { error: blocked } : await runTool(call); }
       catch (error) { result = { error: error instanceof Error ? error.message : String(error) }; }
       log({ event: blocked ? 'blocked' : 'tool-result', step, call, result });
+      // id зʼєднує цей результат із відповідним викликом.
       messages.push({ role: 'tool', content: [{ type: 'tool-result', toolCallId: call.id,
         toolName: call.name, output: { type: 'json', value: result } }] });
     }
