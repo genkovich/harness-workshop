@@ -31,7 +31,7 @@ export async function runAgent(agent: Agent, task: string) {
   });
 
   if (process.env.TRACE === '1') {
-    console.log('HTTP-запит:', reply.request.body);
+    console.log('HTTP-запит:', reply.finalStep.request.body);
   }
   if (reply.finishReason === 'length') {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
