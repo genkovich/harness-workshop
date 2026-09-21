@@ -11,11 +11,17 @@
 | @openrouter/ai-sdk-provider | 3.1.0 | 3.1.0 | ai ^7.0.0, zod ^3.25.76 або ^4.1.8, Node >=22 |
 | ai | 7.0.107 | 7.0.107 | zod ^3.25.76 або ^4.1.8, Node >=22 |
 | zod | 4.6.5 | 4.6.5 | У межах peer dependencies обох пакетів |
-| typescript | 7.0.2 | 7.0.2 | Node >=16.20; наш Node 24 підходить |
-| tsx | 4.23.15 | 4.23.15 | Node >=18; наш Node 24 підходить |
+| typescript | 7.0.2 | 7.0.2 | Node >=16.20; наш Node 26 підходить |
+| tsx | 4.23.15 | 4.23.15 | Node >=18; наш Node 26 підходить |
 | @types/node | 26.6.2 | 26.6.2 | Це типи для редактора/tsc, а не встановлення Node runtime |
 
-Номери та engines/peerDependencies перевірені через публічний npm registry. Пакети вже були актуальними; залежності та lockfile не змінювалися. Рекомендований runtime — Node 24.21.0 LTS; .nvmrc та CI використовують його. У коді використовуємо API, доступні в цьому runtime.
+Номери та engines/peerDependencies перевірені через публічний npm registry. Усі шість прямих залежностей уже відповідають npm latest; їх перевстановлено. Node оновлено з 23.6.1 до 26.9.0, npm — до 12.0.2. Current — стабільний реліз, ще не LTS. Рекомендований runtime — Node 26.9.0 LTS; .nvmrc та CI використовують його. У коді використовуємо API, доступні в цьому runtime.
+
+## Вкладені залежності та npm 12
+
+`npm outdated --all` також перевіряє вкладені пакети. Їхні найновіші сумісні версії вже встановлено. AI SDK фіксує `@vercel/oidc` на 3.2.0 і `@workflow/serde` на 4.1.0; `eventsource-parser` обмежено гілкою 3, `undici` — гілкою 7, а `undici-types` — 8.9.x. Новіші релізи поза цими обмеженнями примусово через overrides не підставляємо: сумісність визначають пакети, що їх використовують.
+
+У npm 12 install-скрипти залежностей потребують `allowScripts`. У package.json дозволено лише зафіксовані `esbuild@0.28.2` та `fsevents@2.3.3`, потрібні інструментам TypeScript. Учаснику достатньо `npm ci`; налаштування вже в репозиторії. [Документація npm](https://docs.npmjs.com/cli/commands/npm-install-scripts).
 
 ## Перевірка через Context7 MCP
 
@@ -40,6 +46,6 @@ npm view tsx version engines
 npm view @types/node version
 ```
 
-Після зміни залежностей проганяємо типи й тести кожної контрольної гілки, а готове рішення — на Windows, macOS і Linux. Для Node 24 перевіряємо також команду setup:check. CI не робить запитів до живої моделі й не потребує API-ключів.
+Після зміни залежностей проганяємо типи й тести кожної контрольної гілки, а готове рішення — на Windows, macOS і Linux. Для Node 26 перевіряємо також команду setup:check. CI не робить запитів до живої моделі й не потребує API-ключів.
 
 Модель qwen/qwen3.8-27b:free перевірено в [публічному каталозі OpenRouter](https://openrouter.ai/api/v1/models): ціни prompt/completion дорівнюють 0, supported_parameters містить tools. Це не доказ доступності для конкретного акаунта: її перевіряє учасник командою npm run setup:check.
