@@ -12,11 +12,11 @@
 
 Node.js виконує нашу програму, npm встановлює її пакети. Git дає код і контрольні гілки. Редактор потрібен для src/ і ранбуків; підійде вже знайомий редактор або [VS Code](https://code.visualstudio.com/download).
 
-Використовуємо **Node.js 24 LTS**; на 21.09.2026 перевірена версія **24.21.0**. npm входить до Node.js. Версії пакетів зафіксовані в package-lock.json: учасники виконують npm ci. [Офіційне завантаження Node.js](https://nodejs.org/en/download).
+Використовуємо **Node.js 26 Current**; на 21.09.2026 перевірена версія **26.9.0**. npm входить до Node.js. Current — актуальний стабільний реліз, ще не LTS. Версії пакетів зафіксовані в package-lock.json: учасники виконують npm ci. [Офіційне завантаження Node.js](https://nodejs.org/en/download).
 
 ### Windows: Node.js і Git Bash
 
-1. На сторінці Node.js вибери Windows, гілку 24 LTS та Installer `.msi`. Для звичайного Intel/AMD-компʼютера обирай x64, для Windows on ARM — ARM64.
+1. На сторінці Node.js вибери Windows, гілку 26 Current та Installer `.msi`. Для звичайного Intel/AMD-компʼютера обирай x64, для Windows on ARM — ARM64.
 2. Запусти інсталятор із типовими налаштуваннями. Залиш npm і додавання до PATH; додаткові build tools для цього репозиторію не потрібні.
 3. Встанови [Git for Windows](https://git-scm.com/install/windows). Залиш доступ Git із командного рядка та Git Bash.
 4. Закрий старі термінали й відкрий **Git Bash** із меню Start. Саме в ньому виконуватимемо команди ранбуків. WSL для цього не потрібен.
@@ -28,11 +28,11 @@ npm --version
 git --version
 ```
 
-Має бути Node `v24.x`, версія npm і версія Git. Якщо команда не знайдена, спочатку перезапусти термінал після встановлення. Не встановлюй іншу копію Node навмання.
+Має бути Node `v26.9.0`, версія npm і версія Git. Якщо команда не знайдена, спочатку перезапусти термінал після встановлення. Не встановлюй іншу копію Node навмання.
 
 ### macOS: Node.js і Terminal
 
-1. На сторінці Node.js вибери macOS, 24 LTS та Installer `.pkg`.
+1. На сторінці Node.js вибери macOS, 26 Current та Installer `.pkg`.
 2. Встанови пакет, відкрий новий Terminal. На Mac з Apple Silicon використовуй відповідний ARM64-дистрибутив, якщо сайт просить вибір архітектури.
 3. Виконай git --version. Якщо macOS запропонує Command Line Tools, погодься й дочекайся встановлення. Якщо запрошення не зʼявилося, виконай xcode-select --install. Повний Xcode для практики не потрібен.
 
@@ -42,7 +42,7 @@ npm --version
 git --version
 ```
 
-Очікуємо Node `v24.x` і доступні npm та Git. [Варіанти встановлення Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+Очікуємо Node `v26.9.0` і доступні npm та Git. [Варіанти встановлення Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
 
 ### Linux: приклад для Ubuntu/Debian
 
@@ -63,8 +63,8 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
 
 ```bash
 . "$HOME/.nvm/nvm.sh"
-nvm install 24.21.0
-nvm use 24.21.0
+nvm install 26.9.0
+nvm use 26.9.0
 nvm alias default 24
 node --version
 npm --version
@@ -72,6 +72,17 @@ git --version
 ```
 
 Якщо nvm не знайдений, перевір повідомлення інсталятора про файл профілю shell. Для Fedora/Arch встанови Git і curl своїм пакетним менеджером, а Node — тим самим nvm. Не використовуй sudo для npm ci всередині проєкту.
+
+### Однакова версія npm для всіх ОС
+
+Після встановлення Node виконай у Git Bash (Windows) або Terminal (macOS/Linux):
+
+```bash
+npm install --global npm@12.0.2
+npm --version
+```
+
+Очікуємо `12.0.2`. У PowerShell замість `npm` можна використовувати `npm.cmd`. Якщо Windows відмовляє в доступі до системної папки Node, виконай саме глобальне оновлення npm у терміналі адміністратора, потім повернись у звичайний термінал. На macOS після системного `.pkg` за помилки EACCES можна виконати `sudo npm install --global npm@12.0.2`; для nvm sudo не потрібен. Команди проєкту виконуй без адміністративних прав.
 
 ## 2. Отримай доступ до репозиторію
 
@@ -235,7 +246,7 @@ Remove-Item Env:APPROVED
 | Симптом | Що зробити |
 |---|---|
 | node/npm/git not found | Перезапусти термінал, звір встановлення та PATH. |
-| Node старої версії | Встанови 24 LTS; у nvm виконай nvm use 24.21.0. |
+| Node старої версії | Встанови 26 Current; у nvm виконай nvm use 26.9.0. |
 | GitHub 404 / repository not found | Перевір запрошення й обліковий запис, під яким авторизований Git. |
 | Git просить user.name / user.email | Налаштуй їх локально командами з розділу 3. |
 | npm.ps1 cannot be loaded | У PowerShell викликай npm.cmd або відкрий Git Bash. |
