@@ -10,8 +10,12 @@ if (!task) {
 try {
   const result = await runAgent(news, task);
 
-  if (result.text) console.log(`\nВідповідь: ${result.text}`);
-  if (result.reason === 'limit') process.exitCode = 2;
+  if (result.text) {
+    console.log(`\nВідповідь: ${result.text}`);
+  }
+  if (result.reason === 'limit') {
+    process.exitCode = 2;
+  }
 } catch (error) {
   console.error('Помилка:', error instanceof Error ? error.message : error);
   process.exitCode = 1;
