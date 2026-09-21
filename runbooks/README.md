@@ -34,4 +34,4 @@
 node --inspect-brk --import tsx --env-file-if-exists=.env src/main.ts "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."
 ```
 
-У редакторі підʼєднай налагоджувач Node.js і зупинись після generateText або перед runTool. Ctrl+C завершує процес.
+У редакторі підʼєднай налагоджувач Node.js і зупинись після generateText або всередині `executeTool` перед `agent.runTool`. Ctrl+C завершує процес.

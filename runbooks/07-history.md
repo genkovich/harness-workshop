@@ -19,39 +19,101 @@
 
 ## Маленькі зміни
 
-`reply.response.messages` — повідомлення, які SDK сформував із відповіді моделі. Зберігаємо повний `assistant`, разом із запитами на виклик інструментів. Якби зберегли лише `reply.text`, втратили б запит на дію. `.filter(...)` відбирає повідомлення автора assistant, а `...` передає їх у `push` окремими елементами.
+### 1. Додай повідомлення моделі до історії
 
-У src/harness.ts перед for (const call...) додай повідомлення моделі:
+У нашій версії AI SDK 7 повідомлення відповіді доступні через `reply.responseMessages`. Поле `reply.response` застаріле; `reply.finalStep.response` містить метадані останнього кроку. Для історії нам потрібні саме повідомлення, включно із запитами на інструменти.
 
-```ts
-messages.push(
-  ...reply.response.messages.filter(message => message.role === 'assistant'),
-);
-```
-
-`role: 'tool'` позначає відповідь нашої програми. Усередині `content` блок `type: 'tool-result'` містить результат конкретної дії; `output: { type: 'json', value: result }` повідомляє SDK формат даних.
-
-Наприклад, якщо модель надіслала `toolCallId: 'call_1'`, результат пошуку теж має отримати `'call_1'`. Одна назва `searchStories` недостатня: модель може викликати пошук кілька разів із різними аргументами.
-
-Усередині for, після друку result, додай результат з тим самим id:
+Після `executeTool` у `src/harness.ts` додай функцію:
 
 ```ts
-messages.push({
-  role: 'tool',
-  content: [{
-    type: 'tool-result',
-    toolCallId: call.toolCallId,
-    toolName: call.toolName,
-    output: { type: 'json', value: result },
-  }],
-});
+function addAssistantMessages(
+  messages: ModelMessage[],
+  responseMessages: ModelMessage[],
+) {
+  for (const message of responseMessages) {
+    if (message.role === 'assistant') {
+      messages.push(message);
+    }
+  }
+}
 ```
 
-Після for покажи стан історії:
+`messages` — наша поточна історія. `responseMessages` — нові повідомлення, отримані від SDK. Перебираємо їх і додаємо лише ті, що мають роль `assistant`. Повідомлення з результатами інструментів сформуємо самі, після виконання: так вони не потраплять в історію двічі.
+
+Ми зберігаємо повідомлення цілком. Якби додали лише `reply.text`, загубили б назви функцій, аргументи та ідентифікатори викликів.
+
+У `runAgent`, **перед циклом `for (const call of reply.toolCalls)`**, виклич функцію:
+
+```ts
+addAssistantMessages(messages, reply.responseMessages);
+```
+
+### 2. Додай результат конкретної дії
+
+Після `addAssistantMessages` створи ще одну функцію. Вона формує повідомлення у форматі SDK та додає його до історії:
+
+```ts
+function addToolResult(
+  messages: ModelMessage[],
+  call: ToolCall,
+  result: JSONValue,
+) {
+  messages.push({
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        output: {
+          type: 'json',
+          value: result,
+        },
+      },
+    ],
+  });
+}
+```
+
+Тут три параметри: історія `messages`, виконаний виклик `call` і його результат `result`. Типи `ToolCall` та `JSONValue` вже додали в темі 06.
+
+- `role: 'tool'` означає, що повідомлення надійшло від нашої програми після виконання інструмента.
+- `type: 'tool-result'` позначає результат однієї дії всередині повідомлення.
+- `toolCallId` звʼязує результат із конкретним запитом моделі. Якщо запит мав `'call_1'`, відповідь теж має містити `'call_1'`.
+- `toolName` зберігає назву інструмента, а `output` передає результат у форматі JSON.
+
+Самої назви `searchStories` недостатньо: модель може попросити два пошуки з різними аргументами. Їх розрізняємо за `toolCallId`.
+
+У `runAgent`, **усередині циклу, після виведення результату**, додай:
+
+```ts
+addToolResult(messages, call, result);
+```
+
+### 3. Перевір послідовність
+
+Ця частина `runAgent` тепер має читатися так:
+
+```ts
+addAssistantMessages(messages, reply.responseMessages);
+
+for (const call of reply.toolCalls) {
+  console.log(`Модель просить ${call.toolName}:`, call.input);
+  const result = await executeTool(agent, call);
+  console.log(`Результат ${call.toolName}:`, result);
+  addToolResult(messages, call, result);
+}
+```
+
+Спочатку записуємо запит моделі, потім виконуємо дію й додаємо результат. `executeTool` повертає і успішні дані, і пояснення помилок — обидва варіанти потрапляють в історію однаково.
+
+Після циклу покажи розмір історії:
 
 ```ts
 console.log('Повідомлень в історії:', messages.length);
 ```
+
+Повторного запиту до моделі тут ще немає. Його додамо в наступній темі.
 
 ## Перевірка
 
@@ -107,10 +169,13 @@ import {
   type ModelMessage,
   type ToolSet,
   type JSONValue,
+  type TypedToolCall,
 } from 'ai';
 
 const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
+
+type ToolCall = TypedToolCall<ToolSet>;
 
 export type Agent = {
   model: LanguageModel;
@@ -136,7 +201,7 @@ export async function runAgent(agent: Agent, task: string) {
   });
 
   if (process.env.TRACE === '1') {
-    console.log('HTTP-запит:', reply.request.body);
+    console.log('HTTP-запит:', reply.finalStep.request.body);
   }
   if (reply.finishReason === 'length') {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
@@ -148,45 +213,71 @@ export async function runAgent(agent: Agent, task: string) {
     return { reason: 'final', text: reply.text, messages };
   }
 
-  // Зберігаємо повідомлення моделі з її tool calls перед результатами.
-  messages.push(
-    ...reply.response.messages.filter((message) => message.role === 'assistant'),
-  );
+  addAssistantMessages(messages, reply.responseMessages);
 
   for (const call of reply.toolCalls) {
     console.log(`Модель просить ${call.toolName}:`, call.input);
-    let result;
-
-    try {
-      // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-      if (call.invalid) {
-        throw call.error;
-      }
-      // Виконання відбувається в нашій програмі, а не в SDK.
-      result = await agent.runTool(call.toolName, call.input);
-    } catch (error) {
-      // Помилка теж результат: модель отримає її в наступному запиті.
-      result = { error: error instanceof Error ? error.message : String(error) };
-    }
+    const result = await executeTool(agent, call);
 
     console.log(`Результат ${call.toolName}:`, result);
-    messages.push({
-      role: 'tool',
-      content: [
-        {
-          type: 'tool-result',
-          toolCallId: call.toolCallId,
-          toolName: call.toolName,
-          output: { type: 'json', value: result },
-        },
-      ],
-    });
+    addToolResult(messages, call, result);
   }
 
   console.log(`Додали результати. Повідомлень в історії: ${messages.length}.`);
 
   console.log('Модель ще не отримала результат. Наступний запит додамо далі.');
   return { reason: 'tool-result', text: '', messages };
+}
+
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    // Не передаємо виконавцю виклик, який SDK позначив некоректним.
+    if (call.invalid) {
+      throw call.error;
+    }
+
+    // await потрібен, щоб catch перехопив і помилку асинхронної функції.
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    // Помилку повертаємо як дані для наступного запиту моделі.
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
+  }
+}
+
+function addAssistantMessages(
+  messages: ModelMessage[],
+  responseMessages: ModelMessage[],
+) {
+  for (const message of responseMessages) {
+    if (message.role === 'assistant') {
+      messages.push(message);
+    }
+  }
+}
+
+function addToolResult(
+  messages: ModelMessage[],
+  call: ToolCall,
+  result: JSONValue,
+) {
+  messages.push({
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        output: {
+          type: 'json',
+          value: result,
+        },
+      },
+    ],
+  });
 }
 ```
 
