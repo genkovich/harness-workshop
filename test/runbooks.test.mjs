@@ -69,6 +69,7 @@ test('00 API-підготовка: Groq повертає коректний tool
   const requests = (await readFile(capture, 'utf8')).trim().split('\n');
   assert.equal(requests.length, 1);
   assert.equal(JSON.parse(requests[0]).model, 'qwen/qwen3.8-27b');
+  assert.ok(JSON.parse(requests[0]).max_tokens > 0 && JSON.parse(requests[0]).max_tokens < 1000);
 });
 
 test('00 API-підготовка: порожній ключ і 429 не запускають прихованих повторів', async (t) => {
@@ -81,4 +82,9 @@ test('00 API-підготовка: порожній ключ і 429 не зап�
   assert.match(limited.result.stderr, /Досягнуто ліміт Groq/);
   assert.match(limited.result.stderr, /Retry-After: 30/);
   assert.equal((await readFile(limited.capture, 'utf8')).trim().split('\n').length, 1);
+  const oversized = await setupCheck(t, 'qwen/qwen3.8-27b', 'offline-test-key', 'too-large');
+  assert.equal(oversized.result.status, 1);
+  assert.match(oversized.result.stderr, /Зменш maxOutputTokens/);
+  assert.doesNotMatch(oversized.result.stderr, /зачекай перед повтором/);
+  assert.equal((await readFile(oversized.capture, 'utf8')).trim().split('\n').length, 1);
 });
