@@ -10,7 +10,7 @@
 
 ## Чого бракує зараз і що зміниться
 
-Опис і промпт можуть попросити не робити дію, але вибір моделі не є перевіркою дозволу. Ставимо код перед runTool, щоб заборонений запис не відбувся.
+Опис і промпт можуть попросити не робити дію, але вибір моделі не є перевіркою дозволу. Додаємо перевірку у `executeTool` перед викликом `agent.runTool`, щоб заборонений запис не відбувся.
 
 - beforeTool перевіряє виклик до дії; APPROVED передаємо через середовище запуску.
 - Якщо повернувся текст блокування, виконавець не запускається, а модель отримує помилку як результат інструмента.
@@ -48,7 +48,7 @@ beforeTool?: (name: string) => string | null;
 
 `beforeTool?` робить перевірку необовʼязковою для інших агентів. `agent.beforeTool?.(...)` викликає її, лише якщо метод є. Непорожній текст у `blocked` перетворюємо на помилку; наявний `catch` додасть її до результату інструмента. Перевірка стоїть **перед** `runTool`, тому файл ще не відкривався для запису.
 
-У try перед agent.runTool встав:
+Відкрий `executeTool` у `src/harness.ts`. Усередині `try`, **після перевірки `call.invalid` і перед `return await agent.runTool(...)`**, встав:
 
 ```ts
 const blocked = agent.beforeTool?.(call.toolName);
@@ -78,7 +78,7 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Очікуємо:** без дозволу saveDigest повертає blocked і не змінює digest.md. Дозволений виклик створює файл або замінює попередній дайджест. Якщо файл існував до забороненого запуску, він має лишитися незмінним.
 
-**Якщо не так:** Файл змінився без дозволу — перевір місце beforeTool. Повторний запит моделі на заборонений інструмент ще не означає виконання дії.
+**Якщо не так:** Файл змінився без дозволу — перевір, чи `beforeTool` стоїть у `executeTool` перед виконанням дії. Повторний запит моделі на заборонений інструмент ще не означає виконання дії.
 
 **Збережи свою зміну:**
 
@@ -120,12 +120,15 @@ import {
   type ModelMessage,
   type ToolSet,
   type JSONValue,
+  type TypedToolCall,
 } from 'ai';
 
 const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
 
 const defaultMaxSteps = 10;
+
+type ToolCall = TypedToolCall<ToolSet>;
 
 export type Agent = {
   model: LanguageModel;
@@ -157,7 +160,7 @@ export async function runAgent(agent: Agent, task: string) {
     });
 
     if (process.env.TRACE === '1') {
-      console.log('HTTP-запит:', reply.request.body);
+      console.log('HTTP-запит:', reply.finalStep.request.body);
     }
     if (reply.finishReason === 'length') {
       throw new Error('Відповідь обрізано. Тули не виконуємо.');
@@ -169,45 +172,14 @@ export async function runAgent(agent: Agent, task: string) {
       return { reason: 'final', text: reply.text, messages };
     }
 
-    // Спочатку запит моделі на виклик тула, потім наш результат.
-    // Беремо лише assistant: помилки тулів повертаємо нижче самі.
-    messages.push(
-      ...reply.response.messages.filter((message) => message.role === 'assistant'),
-    );
+    addAssistantMessages(messages, reply.responseMessages);
 
     for (const call of reply.toolCalls) {
       console.log(`Модель просить ${call.toolName}:`, call.input);
-      let result;
-
-      try {
-        // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-        if (call.invalid) {
-          throw call.error;
-        }
-        const blocked = agent.beforeTool?.(call.toolName);
-        if (blocked) {
-          throw new Error(blocked);
-        }
-
-        // Виконання відбувається в нашій програмі, після перевірки дозволу.
-        result = await agent.runTool(call.toolName, call.input);
-      } catch (error) {
-        // Помилка теж результат: модель отримає її в наступному запиті.
-        result = { error: error instanceof Error ? error.message : String(error) };
-      }
+      const result = await executeTool(agent, call);
 
       console.log(`Результат ${call.toolName}:`, result);
-      messages.push({
-        role: 'tool',
-        content: [
-          {
-            type: 'tool-result',
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            output: { type: 'json', value: result },
-          },
-        ],
-      });
+      addToolResult(messages, call, result);
     }
 
     console.log(`Додали результати. Повідомлень в історії: ${messages.length}.`);
@@ -215,6 +187,62 @@ export async function runAgent(agent: Agent, task: string) {
 
   console.log('Зупинка: досягли ліміту кроків. Задача може бути незавершена.');
   return { reason: 'limit', text: '', messages };
+}
+
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    // Не передаємо виконавцю виклик, який SDK позначив некоректним.
+    if (call.invalid) {
+      throw call.error;
+    }
+
+    const blocked = agent.beforeTool?.(call.toolName);
+    if (blocked) {
+      throw new Error(blocked);
+    }
+
+    // await потрібен, щоб catch перехопив і помилку асинхронної функції.
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    // Помилку повертаємо як дані для наступного запиту моделі.
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
+  }
+}
+
+function addAssistantMessages(
+  messages: ModelMessage[],
+  responseMessages: ModelMessage[],
+) {
+  for (const message of responseMessages) {
+    if (message.role === 'assistant') {
+      messages.push(message);
+    }
+  }
+}
+
+function addToolResult(
+  messages: ModelMessage[],
+  call: ToolCall,
+  result: JSONValue,
+) {
+  messages.push({
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        output: {
+          type: 'json',
+          value: result,
+        },
+      },
+    ],
+  });
 }
 ```
 
