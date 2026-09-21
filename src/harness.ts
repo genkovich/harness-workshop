@@ -42,6 +42,11 @@ export async function runAgent(agent: Agent, task: string) {
     return { reason: 'final', text: reply.text, messages };
   }
 
+  // Зберігаємо повідомлення моделі з її tool calls перед результатами.
+  messages.push(
+    ...reply.response.messages.filter((message) => message.role === 'assistant'),
+  );
+
   for (const call of reply.toolCalls) {
     console.log(`Модель просить ${call.toolName}:`, call.input);
     let result;
@@ -59,9 +64,20 @@ export async function runAgent(agent: Agent, task: string) {
     }
 
     console.log(`Результат ${call.toolName}:`, result);
-
+    messages.push({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: call.toolCallId,
+          toolName: call.toolName,
+          output: { type: 'json', value: result },
+        },
+      ],
+    });
   }
 
+  console.log(`Додали результати. Повідомлень в історії: ${messages.length}.`);
 
   console.log('Модель ще не отримала результат. Наступний запит додамо далі.');
   return { reason: 'tool-result', text: '', messages };
