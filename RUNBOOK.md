@@ -1,60 +1,92 @@
-# 10. Правила з файла
+# 11. Skills
 
-Почни з власного коду після етапу 09. Змінюй лише `src/`. Контрольна точка після виконання: `step-10-context`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 10. Змінюй лише `src/`. Контрольна точка після виконання: `step-11-skills`. Тести й конфігурація вже готові.
 
-AGENTS.md уже підготовлено. Прочитай файл: у ньому правило починати відповідь словами «Дякуємо за звернення». У src/billing/agent.ts додай:
-
-```ts
-import { readFileSync } from 'node:fs';
-
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
-```
-
-У billing додай поле:
+skills/billing/SKILL.md уже лежить у заготовці. Створи src/skills.ts. Перший фрагмент:
 
 ```ts
-context: rules,
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+
+const directory = new URL('../skills/', import.meta.url);
 ```
 
-У тип Agent у src/harness.ts додай:
+Нижче склади список skills. Повний текст поки залишається в нашій програмі:
 
 ```ts
-context?: string;
+export const skills = readdirSync(directory)
+  .filter(name => existsSync(new URL(`${name}/SKILL.md`, directory)))
+  .map(name => {
+    const text = readFileSync(new URL(`${name}/SKILL.md`, directory), 'utf8');
+    const description = /^description: (.+)$/m.exec(text)?.[1];
+    if (!description) throw new Error(`Немає description у skill ${name}`);
+    return { name, description, text };
+  });
 ```
 
-У початковому messages заміни content user-повідомлення:
+Додай функцію читання за іменем:
 
 ```ts
-content: `${agent.context || ''}\n${task}`.trim(),
+export function readSkill(name: string) {
+  const skill = skills.find(skill => skill.name === name);
+  if (!skill) throw new Error(`Невідомий skill: ${name}`);
+  return skill.text;
+}
 ```
 
-Подивись перший запит:
+У src/billing/agent.ts додай імпорт і два значення поруч зі схемами:
 
-```bash
-TRACE=1 npm start
+```ts
+import { skills, readSkill } from '../skills.ts';
+
+const skillInput = z.object({ name: z.string() });
+const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
+```
+
+Заміни context: rules на:
+
+```ts
+context: `${rules}\nSkills:\n${descriptions}`,
+```
+
+У billing.tools додай опис:
+
+```ts
+readSkill: tool({
+  description: 'Прочитай повну інструкцію потрібного skill.',
+  inputSchema: skillInput,
+}),
+```
+
+Перед default у runTool додай виконання:
+
+```ts
+case 'readSkill': {
+  const { name } = skillInput.parse(input);
+  return { text: readSkill(name) };
+}
 ```
 
 ## Запусти й перевір
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[1-9]|10) "
+npm test -- --test-name-pattern "^(0[1-9]|1[01]) "
 npm start
 ```
 
-**Тести:** 10 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
+**Тести:** 11 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
 
-**Очікуємо:** Десять тестів проходять. Правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді живої моделі.
+**Очікуємо:** Одинадцять тестів проходять. Спочатку модель бачить опис; після readSkill — повний текст у tool result.
 
-**Якщо не так:** Файл є, тексту немає — звір billing.context і складання messages. Файл редагувати не потрібно.
+**Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя billing, не шлях. Для живої перевірки попроси явно прочитати billing.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 10: Правила з файла"
+git commit -m "Етап 11: Skills"
 ```
 
-Далі відкрий [етап 11 у браузері](https://github.com/genkovich/harness-workshop/blob/step-11-skills/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Далі відкрий [етап 12 у браузері](https://github.com/genkovich/harness-workshop/blob/step-12-guard/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
 
