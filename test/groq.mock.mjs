@@ -7,6 +7,13 @@ globalThis.fetch = async (url, options) => {
   assert.equal(String(url), 'https://api.groq.com/openai/v1/chat/completions');
   const request = JSON.parse(options.body);
   appendFileSync(process.env.HARNESS_REQUESTS_PATH, JSON.stringify(request) + '\n');
+  // Відтворюємо ліміт із реальної помилки учасника: запит понад 1000 не приймається.
+  if (request.max_tokens > 1000 || process.env.HARNESS_SETUP_STATUS === 'too-large') {
+    return Response.json({ error: {
+      message: 'Request too large on output tokens per minute (OTPM): Limit 1000. Reduce max_tokens.',
+      type: 'tokens',
+    } }, { status: 429 });
+  }
   if (process.env.HARNESS_SETUP_TEST === '1' && process.env.HARNESS_SETUP_STATUS === '429') {
     return Response.json({ error: { message: 'Rate limit reached', type: 'tokens' } }, {
       status: 429, headers: { 'retry-after': '30' },

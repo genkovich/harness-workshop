@@ -2,7 +2,7 @@
 
 [Підготовка](00-start.md) · [Усі теми](README.md)
 
-Перевірено 21.09.2026. Учасник виконує npm ci й отримує зафіксовані версії. Новий latest під час заняття не встановлюємо.
+Перевірено 21.09.2026. Учасник виконує npm ci й отримує зафіксовані версії. Під час заняття версії не оновлюємо.
 
 ## Що перевірено
 
@@ -13,9 +13,9 @@
 | zod | 4.6.5 | 4.6.5 | У межах peer dependencies обох пакетів |
 | typescript | 7.0.2 | 7.0.2 | Node >=16.20; наш Node 26 підходить |
 | tsx | 4.23.15 | 4.23.15 | Node >=18; наш Node 26 підходить |
-| @types/node | 26.6.2 | 26.6.2 | Це типи для редактора/tsc, а не встановлення Node runtime |
+| @types/node | 26.6.2 | 26.6.2 | Це типи для редактора/tsc, а не встановлення середовища виконання Node.js |
 
-Номери та engines/peerDependencies перевірені через публічний npm registry. Усі шість прямих залежностей уже відповідають npm latest; їх перевстановлено. Node оновлено з 23.6.1 до 26.9.0, npm — до 12.0.2. Current — стабільний реліз, ще не LTS. Рекомендований runtime — Node 26.9.0 Current; .nvmrc та CI використовують його. У коді використовуємо API, доступні в цьому runtime.
+Номери та engines/peerDependencies перевірені через публічний npm registry. Усі шість прямих залежностей уже відповідають npm latest; їх перевстановлено. Node оновлено з 23.6.1 до 26.9.0, npm — до 12.0.2. Current — стабільний реліз, ще не LTS. Середовище виконання для практики — Node 26.9.0 Current; .nvmrc та CI використовують його. У коді використовуємо API, доступні у цій версії Node.js.
 
 ## Вкладені залежності та npm 12
 
@@ -28,14 +28,14 @@
 Сервер context7 підключено через https://mcp.context7.com/mcp. Виконано MCP tools/list, resolve-library-id і query-docs. Перевірено:
 
 - /websites/ai-sdk_dev: generateText, inputSchema, Zod 4, формат assistant/tool messages і toolCallId.
-- /websites/ai-sdk_dev: Groq provider, groq/createGroq, GROQ_API_KEY, вибір моделі, custom fetch. Запит через Context7 повторено під час переходу на Groq; @ai-sdk/groq 4.0.46 звірено з npm.
+- /websites/ai-sdk_dev: адаптер Groq, groq/createGroq, GROQ_API_KEY, вибір моделі, власна функція `fetch`. Запит через Context7 повторено під час переходу на Groq; @ai-sdk/groq 4.0.46 звірено з npm.
 - /websites/zod_dev: z.object, числові обмеження, parse і safeParse.
 
-Context7 не підтвердив точні patch-релізи всіх пакетів: у списках версій є старі знімки. Деякі приклади адаптера також використовують старі форми tools. Тому версії всіх шести пакетів звірено з npm, а поточні сигнатури — зі встановленими пакетами та виконанням тестів. Не видаємо результат пошуку документації за доказ останнього релізу.
+Context7 не підтвердив точні версії виправлень (patch) всіх пакетів: у списках версій є старі знімки. Деякі приклади адаптера також використовують старі форми tools. Тому версії всіх шести пакетів звірено з npm, а поточні сигнатури — зі встановленими пакетами та виконанням тестів. Не видаємо результат пошуку документації за доказ останнього релізу.
 
 ## Джерела й повторення перевірки
 
-[AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text) · [Groq provider](https://ai-sdk.dev/providers/ai-sdk-providers/groq) · [Zod](https://zod.dev/basics) · [Node.js](https://nodejs.org/en/download) · [Context7 MCP](https://context7.com/docs/resources/all-clients).
+[AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text) · [адаптер Groq](https://ai-sdk.dev/providers/ai-sdk-providers/groq) · [Zod](https://zod.dev/basics) · [Node.js](https://nodejs.org/en/download) · [Context7 MCP](https://context7.com/docs/resources/all-clients).
 
 ```bash
 npm view @ai-sdk/groq version engines peerDependencies
@@ -46,8 +46,8 @@ npm view tsx version engines
 npm view @types/node version
 ```
 
-Після зміни залежностей проганяємо типи й тести кожної контрольної гілки, а готове рішення — на Windows, macOS і Linux. Для Node 26 перевіряємо також команду setup:check. CI не робить запитів до живої моделі й не потребує API-ключів.
+Після зміни залежностей запускаємо перевірку типів і тести кожної контрольної гілки, а готове рішення — на Windows, macOS і Linux. Для Node 26 перевіряємо також команду setup:check. CI не робить запитів до моделі через API й не потребує API-ключів.
 
-Модель qwen/qwen3.8-27b і tool calling перевірені за [документацією Groq](https://console.groq.com/docs/model/qwen/qwen3.8-27b). Безкоштовність визначає Free plan акаунта, не суфікс моделі. Developer оплачує токени. setup:check робить один запит і перевіряє tool call, але не читає тариф акаунта. Живий виклик під час міграції не виконано: локальний GROQ_API_KEY не заданий. Тести перевіряють справжній адаптер із підміненим HTTP.
+Модель qwen/qwen3.8-27b і виклик інструментаing перевірені за [документацією Groq](https://console.groq.com/docs/model/qwen/qwen3.8-27b). Безкоштовний доступ залежить від тарифу Free plan у Groq. Developer оплачує токени. setup:check робить один запит і перевіряє виклик інструмента, але не читає тариф акаунта. Живий виклик під час міграції не виконано: локальний GROQ_API_KEY не заданий. Тести перевіряють справжній адаптер із підміненим HTTP.
 
 HN Search: https://hn.algolia.com/api, без додаткових ключів. Вбудовані fetch та node:fs/promises; залежності для нового агента не додавалися. Документацію перевірено через Context7; живий пошук та читання коментарів — окремими HTTP-запитами.
