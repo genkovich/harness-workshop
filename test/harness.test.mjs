@@ -306,3 +306,28 @@ test('12 Дозвіл: APPROVED=1 дозволяє рівно один запи�
   assert.equal(lines.length, 1);
   assert.equal(JSON.parse(lines[0]).text, 'Дозволено');
 });
+
+async function rejectsEmptyTask(t, args) {
+  const temporary = await mkdtemp(join(tmpdir(), 'harness-empty-task-'));
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const capture = join(temporary, 'requests.jsonl');
+  const result = spawnSync(process.execPath, [
+    '--import', './test/openrouter.mock.mjs', '--import', 'tsx', 'src/main.ts', ...args,
+  ], {
+    cwd: root, encoding: 'utf8', timeout: 15_000,
+    env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key', HARNESS_REQUESTS_PATH: capture },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Помилка: передай задачу/);
+  assert.doesNotMatch(result.stdout, /Тестова відповідь/);
+  await assert.rejects(() => readFile(capture), { code: 'ENOENT' });
+}
+
+test('02 Ввід: без аргументу помилка, запит до API не відбувається', async (t) => {
+  await rejectsEmptyTask(t, []);
+});
+
+test('02 Ввід: порожній рядок і пробіли відхиляються до виклику API', async (t) => {
+  await rejectsEmptyTask(t, ['']);
+  await rejectsEmptyTask(t, ['   ']);
+});
