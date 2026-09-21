@@ -48,7 +48,7 @@ npm start -- "Перевір списання клієнта 42."
 
 **Автоматична перевірка:** 11 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Чотири тести проходять. Після одного getCharges у messages три записи: user, assistant, tool. Повторного запиту ще немає.
+**Очікуємо:** Після одного getCharges у messages три записи: user, assistant, tool. Повторного запиту ще немає.
 
 **Якщо не так:** Звір toolCallId. Повідомлення assistant має стояти перед його tool result; одного console.log для передачі моделі недостатньо.
 
