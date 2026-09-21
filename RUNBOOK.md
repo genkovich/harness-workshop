@@ -1,77 +1,65 @@
-# 03. Функція запиту
+# 04. Описи тулів
 
-Почни з власного коду після етапу 02. Змінюй лише `src/`. Контрольна точка після виконання: `step-03-function`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 03. Змінюй лише `src/`. Контрольна точка після виконання: `step-04-tools`. Тести й конфігурація вже готові.
 
-Створи `src/harness.ts`. Спочатку імпорти й тип параметра:
+Дані вже лежать у src/billing/charges.json. Створи поряд `src/billing/agent.ts`:
 
 ```ts
-import { generateText, type LanguageModel, type ModelMessage } from 'ai';
+import { tool } from 'ai';
+import { z } from 'zod';
 
-export type Agent = {
-  model: LanguageModel;
-  system: string;
+const customerId = z.number().int().positive();
+const chargesInput = z.object({ customerId });
+const replyInput = z.object({
+  customerId,
+  text: z.string().min(1).max(4000),
+});
+```
+
+Нижче створи обʼєкт billing:
+
+```ts
+export const billing = {
+  system: 'Ти агент підтримки. Перевір списання через getCharges, ' +
+    'потім відповідай через sendReply. ' +
+    'Якщо дію заблоковано, попроси дозвіл.',
+  tools: {
+    // Тут будуть два описи нижче.
+  },
 };
 ```
 
-Нижче створи функцію. Між messages і return перенесемо готовий запит:
+У tools додай перший опис:
 
 ```ts
-export async function runAgent(agent: Agent, task: string) {
-  const messages: ModelMessage[] = [{ role: 'user', content: task }];
-  // Тут буде твій generateText і перевірки нижче.
-  return { reason: 'final', text: reply.text, messages };
-}
+getCharges: tool({
+  description: 'Знайди списання клієнта.',
+  inputSchema: chargesInput,
+}),
 ```
 
-Перенеси const reply = await generateText(...) зі src/main.ts у позначене місце. Заміни тільки ці три поля; maxRetries, maxOutputTokens і timeout залиш:
+Поряд додай другий:
 
 ```ts
-model: agent.model,
-system: agent.system,
-messages,
+sendReply: tool({
+  description: 'Надішли відповідь після перевірки списань.',
+  inputSchema: replyInput,
+}),
 ```
 
-У параметри generateText додай:
+У src/main.ts додай імпорт:
 
 ```ts
-include: { requestBody: true },
+import { billing } from './billing/agent.ts';
 ```
 
-Після запиту, перед return, додай дві перевірки:
+У параметрі runAgent заміни system на розгортання billing:
 
 ```ts
-if (process.env.TRACE === '1') {
-  console.log('HTTP-запит:', reply.request.body);
-}
-if (reply.finishReason === 'length') {
-  throw new Error('Відповідь обрізано. Тули не виконуємо.');
-}
-```
-
-Тепер у src/main.ts лиши підключення моделі. Імпорти:
-
-```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
-import { runAgent } from './harness.ts';
-```
-
-Після імпортів додай задачу й запуск. Старий generateText уже перенесений:
-
-```ts
-const task = process.argv[2] || 'Перевір списання клієнта 42.';
-
-const result = await runAgent({
+{
+  ...billing,
   model: openrouter('openai/gpt-oss-20b'),
-  system: 'Відповідай українською.',
-}, task);
-
-console.log('Відповідь:', result.text);
-```
-
-Для перегляду HTTP body:
-
-```bash
-TRACE=1 npm start
+}
 ```
 
 ## Запусти й перевір
@@ -84,17 +72,17 @@ npm start
 
 **Тести:** 1 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
 
-**Очікуємо:** Перший готовий тест проходить без ключа: один запит завершується текстом. У TRACE видно system та user; заголовок авторизації не друкується.
+**Очікуємо:** Один тест проходить. Описи існують у нашому обʼєкті; у TRACE tools ще немає. Наступним кроком передамо їх моделі.
 
-**Якщо не так:** Тест перевіряє наш код із заданою відповіддю моделі. Якщо він проходить, а живий запуск падає, перевір ключ і мережу окремо.
+**Якщо не так:** Не додавай execute до tool(): виконання підключимо власним кодом. Перевір, що обидва описи лежать усередині billing.tools.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 03: Функція запиту"
+git commit -m "Етап 04: Описи тулів"
 ```
 
-Далі відкрий [етап 04 у браузері](https://github.com/genkovich/harness-workshop/blob/step-04-tools/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Далі відкрий [етап 05 у браузері](https://github.com/genkovich/harness-workshop/blob/step-05-call/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
 

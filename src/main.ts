@@ -1,5 +1,6 @@
 import { openrouter } from '@openrouter/ai-sdk-provider';
 import { runAgent } from './harness.ts';
+import { billing } from './billing/agent.ts';
 
 const task =
   process.argv[2] ||
@@ -8,7 +9,7 @@ const task =
 try {
   const result = await runAgent(
     {
-      system: 'Відповідай українською.',
+      ...billing,
       model: openrouter('openai/gpt-oss-20b'),
     },
     task,
