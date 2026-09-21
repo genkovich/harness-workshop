@@ -11,11 +11,14 @@ export type Agent = {
   system: string;
   tools: ToolSet;
   runTool: (name: string, input: unknown) => Promise<JSONValue>;
+  context?: string;
   maxSteps?: number;
 };
 
 export async function runAgent(agent: Agent, task: string) {
-  const messages: ModelMessage[] = [{ role: 'user', content: task }];
+  const messages: ModelMessage[] = [
+    { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
+  ];
 
   for (let step = 1; step <= (agent.maxSteps ?? 10); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);

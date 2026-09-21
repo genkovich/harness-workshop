@@ -1,4 +1,5 @@
 import { appendFile, mkdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tool } from 'ai';
 import { z } from 'zod';
 import charges from './charges.json' with { type: 'json' };
@@ -6,6 +7,7 @@ import charges from './charges.json' with { type: 'json' };
 const customerId = z.number().int().positive();
 const chargesInput = z.object({ customerId });
 const replyInput = z.object({ customerId, text: z.string().min(1).max(4000) });
+const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
@@ -13,6 +15,7 @@ export const billing = {
     'Ти агент підтримки. Перевір списання через getCharges, ' +
     'потім відповідай через sendReply. ' +
     'Якщо дію заблоковано, попроси дозвіл.',
+  context: rules,
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
   tools: {
@@ -21,7 +24,7 @@ export const billing = {
       inputSchema: chargesInput,
     }),
     sendReply: tool({
-      description: 'never call this',
+      description: 'Надішли відповідь після перевірки списань.',
       inputSchema: replyInput,
     }),
   },
