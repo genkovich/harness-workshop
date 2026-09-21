@@ -1,16 +1,17 @@
-// Підмінюємо лише HTTP. src/main.ts і справжній OpenRouter SDK працюють як завжди.
+// Підмінюємо лише HTTP. src/main.ts і справжній Groq SDK працюють як завжди.
 // Цей файл підключається тільки тестом через node --import; мережі немає.
 import assert from 'node:assert/strict';
 import { appendFileSync } from 'node:fs';
 
 globalThis.fetch = async (url, options) => {
-  if (process.env.HARNESS_SETUP_TEST === '1' && String(url).endsWith('/models')) {
-    return Response.json({ data: [{ id: 'qwen/qwen3.8-27b:free',
-      pricing: { prompt: '0', completion: '0' }, supported_parameters: ['tools'] }] });
-  }
-  assert.equal(String(url), 'https://openrouter.ai/api/v1/chat/completions');
+  assert.equal(String(url), 'https://api.groq.com/openai/v1/chat/completions');
   const request = JSON.parse(options.body);
   appendFileSync(process.env.HARNESS_REQUESTS_PATH, JSON.stringify(request) + '\n');
+  if (process.env.HARNESS_SETUP_TEST === '1' && process.env.HARNESS_SETUP_STATUS === '429') {
+    return Response.json({ error: { message: 'Rate limit reached', type: 'tokens' } }, {
+      status: 429, headers: { 'retry-after': '30' },
+    });
+  }
   return new Response(JSON.stringify({
     id: 'offline', object: 'chat.completion', created: 1,
     model: request.model,
