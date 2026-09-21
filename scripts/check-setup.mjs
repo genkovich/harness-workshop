@@ -18,7 +18,7 @@ try {
     }) },
     toolChoice: { type: 'tool', toolName: 'ready' },
     maxRetries: 0,
-    maxOutputTokens: 2048,
+    maxOutputTokens: 128,
     abortSignal: AbortSignal.timeout(60_000),
   });
   if (reply.finishReason === 'length') {
@@ -36,7 +36,11 @@ try {
     404: 'Звір GROQ_MODEL із доступними моделями в Groq Console.',
     429: 'Досягнуто ліміт Groq. Перевір Limits у кабінеті та зачекай перед повтором.',
   };
-  console.error('Перевірка не пройшла:', hints[error?.statusCode] || error.message);
+  const oversized = error?.statusCode === 429 && /request too large|expected output tokens exceed/i.test(error.message);
+  const hint = oversized
+    ? 'Зменш maxOutputTokens: один запит перевищує ліміт токенів. Сама пауза не допоможе.'
+    : hints[error?.statusCode] || error.message;
+  console.error('Перевірка не пройшла:', hint);
   const retryAfter = error?.responseHeaders?.['retry-after'];
   if (retryAfter) console.error(`Retry-After: ${retryAfter}`);
   process.exitCode = 1;

@@ -2,11 +2,11 @@
 
 [Усі теми](README.md) · [Попередня](09-description.md) · [Наступна](11-skills.md)
 
-**Перед початком:** код після `step-09-description`. **Результат теми:** `step-10-context`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-09-description`. **Результат теми:** `step-10-context`. Змінюємо лише `src/`.
 
 ## Що робимо й навіщо
 
-Читаємо підготовлений AGENTS.md і додаємо правила перед задачею. Файл потрапляє в контекст лише тому, що наш код його прочитав і передав.
+Читаємо підготовлений AGENTS.md і додаємо правила перед завданням. Файл потрапляє в контекст лише тому, що наш код його прочитав і передав.
 
 ### Для чого node:fs
 
@@ -14,10 +14,10 @@
 
 ## Чого бракує зараз і що зміниться
 
-Правила лежать у файлі, але сам файл не входить у запит. Читаємо його й явно додаємо текст перед задачею.
+Правила лежать у файлі, але сам файл не входить у запит. Читаємо його й явно додаємо текст перед завданням.
 
 - news.context містить прочитані правила; harness лише додає цей контекст до повідомлення.
-- Правила стають префіксом user-повідомлення. system залишається окремим полем із роллю та загальною поведінкою агента.
+- Правила додаємо на початок повідомлення з роллю `user`. system залишається окремим полем із роллю та загальною поведінкою агента.
 - TRACE і тест показують, чи правило справді передане. Дотримання правила перевіряємо у відповіді моделі окремо.
 
 ## Маленькі зміни
@@ -50,13 +50,13 @@ context: rules,
 context?: string;
 ```
 
-У початковому messages заміни content user-повідомлення:
+У початковому масиві `messages` заміни `content` повідомлення з роллю `user`:
 
 ```ts
 content: `${agent.context || ''}\n${task}`.trim(),
 ```
 
-Шаблонний рядок вставляє контекст і задачу через `${...}`, а `\n` додає перенос рядка. `|| ''` підставляє порожній текст для агента без контексту; `.trim()` прибирає зайві пробіли по краях. Файл не стає особливою системною інструкцією через свою назву: тут ми свідомо передаємо його в user-повідомленні.
+Шаблонний рядок вставляє контекст і завдання через `${...}`, а `\n` додає перенос рядка. `|| ''` підставляє порожній текст для агента без контексту; `.trim()` прибирає зайві пробіли по краях. Файл не стає особливою системною інструкцією через свою назву: тут ми свідомо передаємо його в user-повідомленні.
 
 Подивись перший запит:
 
@@ -74,7 +74,7 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Автоматична перевірка:** 27 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді живої моделі.
+**Очікуємо:** правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді моделі через API.
 
 **Якщо не так:** Файл є, тексту немає — звір news.context і складання messages. Файл редагувати не потрібно.
 
@@ -86,7 +86,7 @@ git diff --cached
 git commit -m "Етап 10: Правила з файла"
 ```
 
-## Якщо не встиг: готова точка й наступна тема
+## Якщо не встиг: готова гілка й наступна тема
 
 Ця гілка містить **результат теми 10**. Збережи свою спробу й створи робочу гілку від готового коду:
 
@@ -120,6 +120,11 @@ import {
   type JSONValue,
 } from 'ai';
 
+const maxOutputTokens = 512;
+const modelTimeoutMs = 60_000;
+
+const defaultMaxSteps = 10;
+
 export type Agent = {
   model: LanguageModel;
   system: string;
@@ -134,7 +139,7 @@ export async function runAgent(agent: Agent, task: string) {
     { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
   ];
 
-  for (let step = 1; step <= (agent.maxSteps ?? 10); step++) {
+  for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
 
     const reply = await generateText({
@@ -143,8 +148,8 @@ export async function runAgent(agent: Agent, task: string) {
       messages,
       tools: agent.tools,
       maxRetries: 0,
-      maxOutputTokens: 1200,
-      abortSignal: AbortSignal.timeout(60_000),
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(modelTimeoutMs),
       include: { requestBody: true },
     });
 
@@ -218,15 +223,23 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
 import { readFileSync } from 'node:fs';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 
 const system = [
