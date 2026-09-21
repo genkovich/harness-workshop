@@ -3,12 +3,14 @@ import {
   type LanguageModel,
   type ModelMessage,
   type ToolSet,
+  type JSONValue,
 } from 'ai';
 
 export type Agent = {
   model: LanguageModel;
   system: string;
   tools: ToolSet;
+  runTool: (name: string, input: unknown) => Promise<JSONValue>;
 };
 
 export async function runAgent(agent: Agent, task: string) {
@@ -42,7 +44,25 @@ export async function runAgent(agent: Agent, task: string) {
 
   for (const call of reply.toolCalls) {
     console.log(`Модель просить ${call.toolName}:`, call.input);
+    let result;
+
+    try {
+      // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
+      if (call.invalid) {
+        throw call.error;
+      }
+      // Виконання відбувається в нашій програмі, а не в SDK.
+      result = await agent.runTool(call.toolName, call.input);
+    } catch (error) {
+      // Помилка теж результат: модель отримає її в наступному запиті.
+      result = { error: error instanceof Error ? error.message : String(error) };
+    }
+
+    console.log(`Результат ${call.toolName}:`, result);
+
   }
 
-  return { reason: 'tool-call', text: reply.text, messages };
+
+  console.log('Модель ще не отримала результат. Наступний запит додамо далі.');
+  return { reason: 'tool-result', text: '', messages };
 }
