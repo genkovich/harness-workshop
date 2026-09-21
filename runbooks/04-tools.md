@@ -81,10 +81,10 @@ import { billing } from './billing/agent.ts';
 ```bash
 npm run check
 npm test -- --test-name-pattern "^0[0-4] "
-npm start
+npm start -- "Перевір списання клієнта 42."
 ```
 
-**Автоматична перевірка:** 6 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 8 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Один тест проходить. Описи існують у нашому обʼєкті; у TRACE tools ще немає. Наступним кроком передамо їх моделі.
 
@@ -118,7 +118,7 @@ npm test -- --test-name-pattern "^0[0-4] "
 
 ## Готовий код
 
-Очікуваний вміст змінених файлів після цього етапу. Інші файли залишаються як були. Це код для звірки; маленькі кроки наведено вище.
+Очікуваний вміст змінених файлів після цього етапу. Інші файли залишаються як були. Маленькі кроки наведено вище.
 
 <details>
 <summary>src/billing/agent.ts</summary>
@@ -163,9 +163,11 @@ import { openrouter } from '@openrouter/ai-sdk-provider';
 import { runAgent } from './harness.ts';
 import { billing } from './billing/agent.ts';
 
-const task =
-  process.argv[2] ||
-  'Клієнт 42: за вересень двічі списали гроші. Перевір і дай відповідь.';
+const task = process.argv[2]?.trim();
+if (!task) {
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  process.exit(1);
+}
 
 try {
   const result = await runAgent(
