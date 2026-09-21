@@ -1,16 +1,16 @@
-# 04. Описи тулів
+# 04. Описи інструментів
 
 [Усі теми](README.md) · [Попередня](03-function.md) · [Наступна](05-call.md)
 
-**Перед початком:** код після `step-03-function`. **Результат теми:** `step-04-tools`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-03-function`. **Результат теми:** `step-04-tools`. Змінюємо лише `src/`.
 
 ## Що робимо й навіщо
 
-Додаємо агента news: модель, структурована інструкція та три описи дій. Модель зможе шукати дискусії, читати аргументи й зберігати дайджест. Описи ще не виконують функцій: їх передавання додамо на етапі 05, виконання — на 06.
+Додаємо агента news: модель, структурована інструкція та три описи дій. Модель зможе шукати дискусії, читати коментарі й зберігати дайджест. Описи ще не виконують функцій: їх передавання додамо на етапі 05, виконання — на 06.
 
-`tool` із пакета `ai` оформлює назву, description та inputSchema. `z` із `zod` описує й перевіряє фактичні аргументи під час виконання. TypeScript перевіряє наш код; Zod — значення, отримані від моделі. `z.string().trim().min(1)` відхиляє порожній запит; `z.number().int().positive()` вимагає додатний цілий id. Номер теми модель бере з результату пошуку, а не вигадує. defaults 7 і 0 означають тиждень та першу порцію; сам запит та id обовʼязкові.
+`tool` із пакета `ai` оформлює назву, description та inputSchema. `z` із `zod` описує й перевіряє фактичні аргументи під час виконання. TypeScript перевіряє наш код; Zod — значення, отримані від моделі. `z.string().trim().min(1)` відхиляє порожній запит; `z.number().int().positive()` вимагає додатний цілий id. Номер теми модель бере з результату пошуку, а не вигадує. Значення за замовчуванням 7 і 0 означають тиждень та першу порцію коментарів; сам запит та id обовʼязкові.
 
-`@ai-sdk/groq` підключає вибрану модель до Groq. Переносимо її разом із правилами й тулами в news: main.ts читає задачу, news визначає можливості агента, harness.ts керує запитами. [AI SDK tools](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) · [Zod](https://zod.dev/basics).
+`@ai-sdk/groq` підключає вибрану модель до Groq. Переносимо її разом із правилами й інструментами в news: main.ts читає завдання, news визначає можливості агента, harness.ts керує запитами. [AI SDK tools](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) · [Zod](https://zod.dev/basics).
 
 ## Маленькі зміни
 
@@ -24,12 +24,22 @@ import { z } from 'zod';
 
 Схема — опис очікуваної форми даних. `z.object` задає поля обʼєкта, `z.string` — рядок, `z.number().int()` — ціле число. `.min()` і `.max()` обмежують довжину рядка або значення числа. `.default(7)` заповнює відсутнє значення; передане некоректне значення, наприклад `days: -1`, не виправляється автоматично.
 
-Додай схему пошуку: не приймаємо порожню тему та необмежений період.
+Спочатку задай межі: довжину пошукового запиту, період пошуку, найбільший відступ у коментарях і довжину дайджесту. Назви констант пояснюють, що саме обмежуємо. Нижче використаємо їх у схемах. Порожній запит відхиляємо, а відсутній період заповнюємо значенням `defaultSearchDays`.
+
+```ts
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+```
+
+Тепер опиши пошук. `query` має бути непорожнім рядком, `days` — додатною кількістю днів у межах `maxSearchDays`:
 
 ```ts
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 ```
 
@@ -40,9 +50,11 @@ const searchInput = z.object({
 ```ts
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
 ```
 
 Далі додай system. Роль визначає тематику; дані пояснюють джерело; межі відділяють коментарі від інструкцій; джерела вимагають посилань. Це інструкції, а не гарантія виконання.
@@ -72,9 +84,9 @@ export const news = {
 };
 ```
 
-Ключ `searchStories` в обʼєкті `tools` стане назвою функції для моделі. `description` пояснює, коли її обирати, а `inputSchema` описує аргументи. Сам `tool(...)` тут створює опис: функцію HTTP він не запускає. `execute` — готовий спосіб доручити виконання SDK; ми його не задаємо, бо в темі 06 напишемо власний виконавець.
+Ключ `searchStories` в обʼєкті `tools` стане назвою функції для моделі. `description` пояснює, коли її обирати, а `inputSchema` описує аргументи. Сам `tool(...)` тут створює опис: HTTP-запит він не виконує. `execute` — готовий спосіб доручити виконання SDK; ми його не задаємо, бо в темі 06 напишемо власний виконавець.
 
-Пошук поверне до десяти кандидатів. Модель обирає, кого читати.
+Пошук поверне до десяти кандидатів. Модель обирає, які обговорення прочитати.
 
 ```ts
     searchStories: tool({
@@ -92,7 +104,7 @@ export const news = {
     }),
 ```
 
-Запис дає перевірний результат — файл. execute не додаємо: дію виконає наш цикл.
+Запис дає результат, який можна перевірити — файл. execute не додаємо: дію виконає наш цикл.
 
 ```ts
     saveDigest: tool({
@@ -111,7 +123,7 @@ import { news } from './news/agent.ts';
 const result = await runAgent(news, task);
 ```
 
-Перевірка порожньої задачі залишається в main.ts. На цьому етапі агент має схеми, але harness ще не передає tools у запит.
+Перевірка порожнього завдання залишається в main.ts. На цьому етапі агент має схеми, але harness ще не передає tools у запит.
 
 ## Перевірка
 
@@ -135,7 +147,7 @@ git diff --cached
 git commit -m "Етап 04: Описи тулів"
 ```
 
-## Якщо не встиг: готова точка й наступна тема
+## Якщо не встиг: готова гілка й наступна тема
 
 Ця гілка містить **результат теми 04**. Збережи свою спробу й створи робочу гілку від готового коду:
 
@@ -173,8 +185,12 @@ if (!task) {
 try {
   const result = await runAgent(news, task);
 
-  if (result.text) console.log(`\nВідповідь: ${result.text}`);
-  if (result.reason === 'limit') process.exitCode = 2;
+  if (result.text) {
+    console.log(`\nВідповідь: ${result.text}`);
+  }
+  if (result.reason === 'limit') {
+    process.exitCode = 2;
+  }
 } catch (error) {
   console.error('Помилка:', error instanceof Error ? error.message : error);
   process.exitCode = 1;
@@ -191,15 +207,23 @@ import { groq } from '@ai-sdk/groq';
 import { tool } from 'ai';
 import { z } from 'zod';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
 
 const system = [
   'Роль: ти дослідник обговорень Hacker News про harness engineering і coding agents.',

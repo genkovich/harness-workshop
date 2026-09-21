@@ -10,7 +10,9 @@ export const skills = readdirSync(directory)
     const text = readFileSync(file, 'utf8');
     const description = /^description: (.+)$/m.exec(text)?.[1];
 
-    if (!description) throw new Error(`Немає description у skill ${name}`);
+    if (!description) {
+      throw new Error(`Немає description у skill ${name}`);
+    }
 
     return { name, description, text };
   });
@@ -18,6 +20,8 @@ export const skills = readdirSync(directory)
 export function readSkill(name: string) {
   // Обираємо зі знайдених skills, а не відкриваємо шлях від моделі.
   const skill = skills.find((skill) => skill.name === name);
-  if (!skill) throw new Error(`Невідомий skill: ${name}`);
+  if (!skill) {
+    throw new Error(`Невідомий skill: ${name}`);
+  }
   return skill.text;
 }
