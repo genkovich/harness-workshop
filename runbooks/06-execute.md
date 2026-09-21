@@ -294,30 +294,64 @@ case 'saveDigest': {
 }
 ```
 
-`JSONValue` описує значення, які можна передати як JSON: рядки, числа, булеві значення, null, масиви й обʼєкти. `Promise<JSONValue>` означає, що результат отримаємо після асинхронної дії. Тому перед `runTool` потрібен `await`.
+### 6. Відокреми виконання одного інструмента
 
-У src/harness.ts додай type JSONValue до імпорту з ai, а до Agent — контракт виконавця:
+Цикл має показувати послідовність дій. Перевірки одного виклику та обробку його помилок перенесемо у функцію `executeTool` в тому самому `src/harness.ts`.
+
+До наявного імпорту з `ai` додай `type JSONValue` і `type TypedToolCall`. Після імпортів та констант, перед типом `Agent`, додай коротку назву типу виклику:
+
+```ts
+type ToolCall = TypedToolCall<ToolSet>;
+```
+
+`TypedToolCall` — готовий тип AI SDK для запиту на виконання інструмента. `ToolSet` указує, що працюємо зі словником інструментів. Назва `ToolCall` потрібна лише для читабельного підпису нашої функції. Такий обʼєкт містить `toolName`, `input`, `toolCallId`, а для некоректного виклику — ще `invalid` та `error`.
+
+До типу `Agent` додай метод виконання:
 
 ```ts
 runTool: (name: string, input: unknown) => Promise<JSONValue>;
 ```
 
-`call.invalid` означає, що SDK уже позначив виклик інструмента некоректним. `throw call.error` переводить його в обробку помилки до виконавця. `try/catch` також перехоплює помилки запиту до HN або перевірки Zod. Ми перетворюємо її на `{ error: 'пояснення' }`, щоб на наступному етапі повернути моделі дані для виправлення дії. `instanceof Error` дозволяє взяти `.message`; для інших значень використовуємо `String(error)`.
+`JSONValue` означає дані, які можна передати як JSON: рядок, число, булеве значення, `null`, масив або обʼєкт. `Promise<JSONValue>` означає, що результат прийде після асинхронної операції. `agent.runTool` уже реалізований у `news`: він вибирає потрібну функцію за назвою.
 
-У for (const call...) після друку аргументів додай виконання:
+У кінці `src/harness.ts`, **після закривної дужки `runAgent`**, створи `executeTool`. Спочатку виконаємо дію й перетворимо можливу помилку на дані:
 
 ```ts
-let result;
-try {
-  if (call.invalid) {
-    throw call.error;
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
   }
-  result = await agent.runTool(call.toolName, call.input);
-} catch (error) {
-  result = { error: error instanceof Error ? error.message : String(error) };
 }
+```
+
+`try` містить дію, яка може завершитися помилкою. `catch` перехоплює її й повертає обʼєкт із поясненням. Для стандартного `Error` беремо `message`; інше значення перетворюємо на рядок. Цей обʼєкт згодом передамо моделі, щоб вона могла змінити дію.
+
+**Залиш `await` після `return`.** Він потрібен, щоб ця функція дочекалася завершення дії й перехопила її асинхронну помилку у своєму `catch`.
+
+Тепер на початку `try`, перед `return await`, додай перевірку виклику:
+
+```ts
+if (call.invalid) {
+  throw call.error;
+}
+```
+
+`call.invalid` означає, що SDK уже виявив проблему з назвою або аргументами. `throw` передає помилку в той самий `catch`; `agent.runTool` у цьому випадку не запускається. На етапі 12 тут само перевіримо дозвіл на дію.
+
+Повернися в `runAgent`. Усередині `for (const call of reply.toolCalls)`, після виведення назви та аргументів, додай лише два рядки:
+
+```ts
+const result = await executeTool(agent, call);
 console.log(`Результат ${call.toolName}:`, result);
 ```
+
+Тепер `runAgent` перебирає виклики, а `executeTool` виконує один із них і повертає результат або пояснення помилки. Нових файлів для цього не потрібно.
 
 Кінцевий return tool-call заміни на:
 
@@ -381,10 +415,13 @@ import {
   type ModelMessage,
   type ToolSet,
   type JSONValue,
+  type TypedToolCall,
 } from 'ai';
 
 const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
+
+type ToolCall = TypedToolCall<ToolSet>;
 
 export type Agent = {
   model: LanguageModel;
@@ -410,7 +447,7 @@ export async function runAgent(agent: Agent, task: string) {
   });
 
   if (process.env.TRACE === '1') {
-    console.log('HTTP-запит:', reply.request.body);
+    console.log('HTTP-запит:', reply.finalStep.request.body);
   }
   if (reply.finishReason === 'length') {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
@@ -424,19 +461,7 @@ export async function runAgent(agent: Agent, task: string) {
 
   for (const call of reply.toolCalls) {
     console.log(`Модель просить ${call.toolName}:`, call.input);
-    let result;
-
-    try {
-      // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-      if (call.invalid) {
-        throw call.error;
-      }
-      // Виконання відбувається в нашій програмі, а не в SDK.
-      result = await agent.runTool(call.toolName, call.input);
-    } catch (error) {
-      // Помилка теж результат: модель отримає її в наступному запиті.
-      result = { error: error instanceof Error ? error.message : String(error) };
-    }
+    const result = await executeTool(agent, call);
 
     console.log(`Результат ${call.toolName}:`, result);
 
@@ -445,6 +470,25 @@ export async function runAgent(agent: Agent, task: string) {
 
   console.log('Модель ще не отримала результат. Наступний запит додамо далі.');
   return { reason: 'tool-result', text: '', messages };
+}
+
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    // Не передаємо виконавцю виклик, який SDK позначив некоректним.
+    if (call.invalid) {
+      throw call.error;
+    }
+
+    // await потрібен, щоб catch перехопив і помилку асинхронної функції.
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    // Помилку повертаємо як дані для наступного запиту моделі.
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
+  }
 }
 ```
 
