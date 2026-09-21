@@ -65,11 +65,11 @@ messages,
 include: { requestBody: true },
 ```
 
-Після запиту додай перемикач діагностики. `TRACE` — змінна, яку придумали ми для цієї програми; це не параметр Groq. Значення змінних середовища є рядками, тому порівнюємо з `'1'`. Лише в цьому режимі друкуємо `reply.request.body`. Це тіло запиту, без заголовка авторизації.
+Після запиту додай перемикач діагностики. `TRACE` — змінна, яку придумали ми для цієї програми; це не параметр Groq. Значення змінних середовища є рядками, тому порівнюємо з `'1'`. Лише в цьому режимі друкуємо `reply.finalStep.request.body`. `finalStep` містить останній крок SDK; у нас це єдиний запит у цьому виклику `generateText`. Читаємо тіло запиту без заголовка авторизації.
 
 ```ts
 if (process.env.TRACE === '1') {
-  console.log('HTTP-запит:', reply.request.body);
+  console.log('HTTP-запит:', reply.finalStep.request.body);
 }
 ```
 
@@ -198,7 +198,7 @@ export async function runAgent(agent: Agent, task: string) {
   });
 
   if (process.env.TRACE === '1') {
-    console.log('HTTP-запит:', reply.request.body);
+    console.log('HTTP-запит:', reply.finalStep.request.body);
   }
   if (reply.finishReason === 'length') {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
