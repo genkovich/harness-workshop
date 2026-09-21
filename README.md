@@ -74,7 +74,7 @@ git add -A
 # Перевір, що саме зберігаєш.
 git diff --cached
 git commit -m "Мій цикл"
-git switch step-1-request
+git switch main
 ```
 
 Для наступних збережень обирай нову назву власної гілки. Якщо змін немає, достатньо `git switch`.
