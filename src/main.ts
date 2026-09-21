@@ -2,9 +2,11 @@ import { openrouter } from '@openrouter/ai-sdk-provider';
 import { runAgent } from './harness.ts';
 import { billing } from './billing/agent.ts';
 
-const task =
-  process.argv[2] ||
-  'Клієнт 42: за вересень двічі списали гроші. Перевір і дай відповідь.';
+const task = process.argv[2]?.trim();
+if (!task) {
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  process.exit(1);
+}
 
 try {
   const result = await runAgent(
