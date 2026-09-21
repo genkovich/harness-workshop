@@ -13,7 +13,7 @@
     "setup:check": "node --env-file-if-exists=.env scripts/check-setup.mjs"
   },
   "dependencies": {
-    "@openrouter/ai-sdk-provider": "3.1.0",
+    "@ai-sdk/groq": "4.0.46",
     "ai": "7.0.107",
     "zod": "4.6.5"
   },
