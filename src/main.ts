@@ -1,7 +1,7 @@
 import { generateText } from 'ai';
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 
-const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free');
+const model = groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b');
 
 const reply = await generateText({
   model,
