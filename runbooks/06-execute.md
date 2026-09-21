@@ -90,7 +90,7 @@ npm start -- "Перевір списання клієнта 42."
 
 **Автоматична перевірка:** 10 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Три тести проходять. getCharges повертає два списання; некоректні аргументи відхиляються. Результат поки лише в терміналі.
+**Очікуємо:** getCharges повертає два списання; некоректні аргументи відхиляються. Результат поки лише в терміналі.
 
 **Якщо не так:** Читай result.error. customerId має бути числом, назва тула повинна збігатися з case. Реальних листів sendReply не надсилає.
 
@@ -128,6 +128,7 @@ npm test -- --test-name-pattern "^0[0-6] "
 <summary>src/billing/agent.ts</summary>
 
 ```ts
+import { openrouter } from '@openrouter/ai-sdk-provider';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -137,12 +138,20 @@ const customerId = z.number().int().positive();
 const chargesInput = z.object({ customerId });
 const replyInput = z.object({ customerId, text: z.string().min(1).max(4000) });
 
+const system = [
+  'Роль: ти агент підтримки з питань списань.',
+  'Мета: перевір факти й поясни клієнту результат.',
+  'Дані: списання отримуй через getCharges; не вигадуй їх.',
+  'Відповідь: після перевірки використовуй sendReply.',
+  'Уточнення: якщо номера клієнта немає, попроси його.',
+  'Межі: не обіцяй повернення коштів; такого тула немає.',
+  'Мова: українська.',
+].join('\n');
+
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  system:
-    'Ти агент підтримки. Перевір списання через getCharges, ' +
-    'потім відповідай через sendReply. ' +
-    'Якщо дію заблоковано, попроси дозвіл.',
+  model: openrouter('openai/gpt-oss-20b'),
+  system,
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
   tools: {
