@@ -2,7 +2,7 @@
 
 [Усі теми](README.md) · [Попередня](08-loop.md) · [Наступна](10-context.md)
 
-**Перед початком:** код після `step-08-loop`. **Результат теми:** `step-09-description`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-08-loop`. **Результат теми:** `step-09-description`. Змінюємо лише `src/`.
 
 ## Що робимо й навіщо
 
@@ -13,19 +13,19 @@
 Цикл працює. Тепер змінюємо одну річ — текст опису — й дивимося, чи змінився вибір моделі. Так відділяємо вплив інструкції від можливостей програми.
 
 - Код saveDigest залишаємо тим самим, щоб не змішувати дві причини зміни поведінки.
-- Рахуємо фактичні tool calls, а не обіцянки в тексті відповіді.
-- Автоматичний тест підтверджує, що опис потрапив у запит і функція досі доступна. Реакцію живої моделі спостерігаємо окремо.
+- Рахуємо фактичні виклики інструментів, а не обіцянки в тексті відповіді.
+- Автоматичний тест підтверджує, що опис потрапив у запит і функція досі доступна. Реакцію моделі через API спостерігаємо окремо.
 - Три запуски — навчальне спостереження, а не оцінка надійності.
 
 ## Маленькі зміни
 
-У src/news/agent.ts збережи description saveDigest. Заміни тільки його значення:
+У `src/news/agent.ts` запамʼятай початковий опис `description` для `saveDigest`. Заміни тільки його значення:
 
 ```ts
 description: 'never call this',
 ```
 
-`never call this` означає «ніколи не викликай цей тул». Ми змінили лише текст для моделі: `saveDigest` лишився у схемах і в `runTool`. Тому модель технічно може його викликати. Справжнє блокування в коді додамо в темі 12.
+`never call this` означає «ніколи не викликай цей інструмент». Ми змінили лише текст для моделі: `saveDigest` лишився у схемах і в `runTool`. Тому модель технічно може його викликати. Справжнє блокування в коді додамо в темі 12.
 
 Запусти тричі з паузами:
 
@@ -49,9 +49,9 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Автоматична перевірка:** 26 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Автоматичні тести циклу проходять. Вплив description перевіряємо живими запусками, не відповідями, заданими в тесті.
+**Очікуємо:** автоматичні тести циклу проходять. Вплив description перевіряємо запитами до API, не відповідями, заданими в тесті.
 
-**Якщо не так:** Модель може викликати тул попри опис. Код виконання весь час доступний. Початковий description повернемо на початку етапу 10.
+**Якщо не так:** Модель може викликати інструмент попри опис. Код виконання весь час доступний. Початковий description повернемо на початку етапу 10.
 
 **Збережи свою зміну:**
 
@@ -61,7 +61,7 @@ git diff --cached
 git commit -m "Етап 09: Експеримент з описом"
 ```
 
-## Якщо не встиг: готова точка й наступна тема
+## Якщо не встиг: готова гілка й наступна тема
 
 Ця гілка містить **результат теми 09**. Збережи свою спробу й створи робочу гілку від готового коду:
 
@@ -95,15 +95,23 @@ import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
 
 const system = [
   'Роль: ти дослідник обговорень Hacker News про harness engineering і coding agents.',
