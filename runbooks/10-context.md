@@ -61,18 +61,18 @@ content: `${agent.context || ''}\n${task}`.trim(),
 Подивись перший запит:
 
 ```bash
-TRACE=1 npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."
+TRACE=1 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
 ## Перевірка
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|10) "
-npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."
+npm test -- --test-name-pattern "^(0[0-9]|08b|10) "
+npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 27 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 29 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді моделі через API.
 
@@ -97,7 +97,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 10"
 git fetch origin
 git switch -c work-11 origin/step-10-context
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|10) "
+npm test -- --test-name-pattern "^(0[0-9]|08b|10) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-11 вже існує, обери нове імʼя, наприклад work-11-retry. .env і node_modules залишаються на місці. Відкрий [ранбук 11](11-skills.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
@@ -114,6 +114,7 @@ npm test -- --test-name-pattern "^(0[0-9]|10) "
 ```ts
 import {
   generateText,
+  APICallError,
   type LanguageModel,
   type ModelMessage,
   type ToolSet,
@@ -125,6 +126,11 @@ const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
 
 const defaultMaxSteps = 10;
+const maxRateLimitRetries = 2;
+const maxRetryDelayMs = 60_000;
+const retrySafetyMs = 1_000;
+const millisecondsPerSecond = 1_000;
+
 
 type ToolCall = TypedToolCall<ToolSet>;
 
@@ -145,16 +151,7 @@ export async function runAgent(agent: Agent, task: string) {
   for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
 
-    const reply = await generateText({
-      model: agent.model,
-      system: agent.system,
-      messages,
-      tools: agent.tools,
-      maxRetries: 0,
-      maxOutputTokens,
-      abortSignal: AbortSignal.timeout(modelTimeoutMs),
-      include: { requestBody: true },
-    });
+    const reply = await requestModel(agent, messages);
 
     if (process.env.TRACE === '1') {
       console.log('HTTP-запит:', reply.finalStep.request.body);
@@ -236,6 +233,59 @@ function addToolResult(
     ],
   });
 }
+
+async function requestModel(agent: Agent, messages: ModelMessage[]) {
+  let retries = 0;
+
+  while (true) {
+    try {
+      return await generateText({
+        model: agent.model,
+        system: agent.system,
+        messages,
+        tools: agent.tools,
+        maxRetries: 0,
+        maxOutputTokens,
+        abortSignal: AbortSignal.timeout(modelTimeoutMs),
+        include: { requestBody: true },
+      });
+    } catch (error) {
+      const waitMs = getRetryDelayMs(error);
+      if (waitMs === null || retries >= maxRateLimitRetries) {
+        throw error;
+      }
+
+      retries += 1;
+      const seconds = Math.ceil(waitMs / millisecondsPerSecond);
+      console.log(`Groq 429: чекаємо ${seconds} с. Повтор ${retries}/${maxRateLimitRetries} з тією самою історією.`);
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+  }
+}
+
+function getRetryDelayMs(error: unknown): number | null {
+  if (!APICallError.isInstance(error) || error.statusCode !== 429) {
+    return null;
+  }
+
+  // Завеликий запит не стане меншим після паузи.
+  if (/request too large|expected output tokens exceed/i.test(error.message)) {
+    return null;
+  }
+
+  let seconds = Number(error.responseHeaders?.['retry-after']);
+  if (!Number.isFinite(seconds)) {
+    const match = /try again in ([\d.]+)s/i.exec(error.message);
+    seconds = Number(match?.[1]);
+  }
+
+  const waitMs = Math.ceil(seconds * millisecondsPerSecond) + retrySafetyMs;
+  if (!Number.isFinite(seconds) || seconds < 0 || waitMs > maxRetryDelayMs) {
+    return null;
+  }
+
+  return waitMs;
+}
 ```
 
 </details>
@@ -290,11 +340,11 @@ export const news = {
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
     searchStories: tool({
-      description: 'Знайди до 10 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
+      description: 'Знайди до 5 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
       inputSchema: searchInput,
     }),
     readDiscussion: tool({
-      description: 'Прочитай 10 коментарів дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
+      description: 'Прочитай 3 коментарі дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
       inputSchema: discussionInput,
     }),
     saveDigest: tool({
