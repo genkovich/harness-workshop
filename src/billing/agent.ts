@@ -21,7 +21,7 @@ export const billing = {
       inputSchema: chargesInput,
     }),
     sendReply: tool({
-      description: 'Надішли відповідь після перевірки списань.',
+      description: 'never call this',
       inputSchema: replyInput,
     }),
   },
