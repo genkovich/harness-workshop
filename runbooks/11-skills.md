@@ -101,11 +101,11 @@ case 'readSkill': {
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|1[01]) "
-npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."
+npm test -- --test-name-pattern "^(0[0-9]|08b|1[01]) "
+npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 28 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 30 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** спочатку модель бачить опис; після readSkill — повний текст у результаті інструмента.
 
@@ -130,7 +130,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 11"
 git fetch origin
 git switch -c work-12 origin/step-11-skills
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|1[01]) "
+npm test -- --test-name-pattern "^(0[0-9]|08b|1[01]) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-12 вже існує, обери нове імʼя, наприклад work-12-retry. .env і node_modules залишаються на місці. Відкрий [ранбук 12](12-guard.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
@@ -231,11 +231,11 @@ export const news = {
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
     searchStories: tool({
-      description: 'Знайди до 10 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
+      description: 'Знайди до 5 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
       inputSchema: searchInput,
     }),
     readDiscussion: tool({
-      description: 'Прочитай 10 коментарів дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
+      description: 'Прочитай 3 коментарі дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
       inputSchema: discussionInput,
     }),
     saveDigest: tool({

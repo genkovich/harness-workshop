@@ -15,16 +15,17 @@
 | [06. Виконання](06-execute.md) | step-05-call | step-06-execute | 17 |
 | [07. Результат в історії](07-history.md) | step-06-execute | step-07-history | 18 |
 | [08. Цикл і зупинка](08-loop.md) | step-07-history | step-08-loop | 25 |
-| [09. Експеримент з описом](09-description.md) | step-08-loop | step-09-description | 26 |
-| [10. Правила з файла](10-context.md) | step-09-description | step-10-context | 27 |
-| [11. Skills](11-skills.md) | step-10-context | step-11-skills | 28 |
-| [12. Дозвіл](12-guard.md) | step-11-skills | step-12-guard | 30 |
+| [08б. Менше даних і пауза при 429](08b-limits.md) | step-08-loop | step-08b-limits | 27 |
+| [09. Експеримент з описом](09-description.md) | step-08b-limits | step-09-description | 28 |
+| [10. Правила з файла](10-context.md) | step-09-description | step-10-context | 29 |
+| [11. Skills](11-skills.md) | step-10-context | step-11-skills | 30 |
+| [12. Дозвіл](12-guard.md) | step-11-skills | step-12-guard | 32 |
 
 ## Тести й налагодження
 
-[Усі сценарії агента](../test/harness.test.mjs) · [середовище та ранбуки](../test/runbooks.test.mjs) · [підміна HTTP](../test/groq.mock.mjs).
+[Усі сценарії агента](../test/harness.test.mjs) · [середовище та ранбуки](../test/runbooks.test.mjs) · [підміна HTTP](../test/groq.mock.mjs) · [дані та повтори після 429](../test/rate-limit.test.mjs).
 
-Тести мають номер теми в назві. Команда в ранбуку перевіряє цей і попередні етапи. На main та step-12-guard запускай npm test: 30 тестів. Перевіряємо структуру запитів, схеми аргументів, виконання, відповідність id, історію, ліміт, помилки, контекст, skills та дозвіл. HTTP у тестах підмінено; запит до API перевіряється окремо командою npm start із явно переданим завданням.
+Тести мають номер теми в назві. Команда в ранбуку перевіряє цей і попередні етапи. На main та step-12-guard запускай npm test: 32 тести. Перевіряємо структуру запитів, схеми аргументів, виконання, відповідність id, історію, ліміт, помилки, контекст, skills та дозвіл. HTTP у тестах підмінено; запит до API перевіряється окремо командою npm start із явно переданим завданням.
 
 На етапі 09 автоматичний тест підтверджує доставку description і доступність функції. Він не вимірює, чи послухається жива модель.
 
