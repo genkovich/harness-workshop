@@ -162,7 +162,7 @@ export function readSkill(name: string) {
 <summary>src/news/agent.ts</summary>
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -196,7 +196,7 @@ const system = [
 
 // Модель, інструкція й тули належать конкретному агенту.
 export const news = {
-  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+  model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
   context: `${rules}\nSkills:\n${descriptions}`,
 

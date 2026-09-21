@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGroq } from "@ai-sdk/groq";
 import { MockLanguageModelV3 } from "ai/test";
 mock.method(console, "log", () => {
 });
@@ -212,11 +212,11 @@ async function runEntry(t, task) {
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const capture = join(temporary, 'requests.jsonl');
   const result = spawnSync(process.execPath, [
-    '--import', './test/openrouter.mock.mjs', '--import', 'tsx', 'src/main.ts', task,
+    '--import', './test/groq.mock.mjs', '--import', 'tsx', 'src/main.ts', task,
   ], {
     cwd: root, encoding: 'utf8', timeout: 15_000,
-    env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key',
-      OPENROUTER_MODEL: 'qwen/qwen3.8-27b:free', HARNESS_REQUESTS_PATH: capture, TRACE: '0', APPROVED: '0' },
+    env: { ...process.env, GROQ_API_KEY: 'offline-test-key',
+      GROQ_MODEL: 'qwen/qwen3.8-27b', HARNESS_REQUESTS_PATH: capture, TRACE: '0', APPROVED: '0' },
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Тестова відповідь без мережі/);
@@ -227,7 +227,7 @@ async function runEntry(t, task) {
 
 test('01 Модель: main.ts робить один справжній запит SDK із підміненим HTTP', async (t) => {
   const request = await runEntry(t, 'Привіт');
-  assert.equal(request.model, 'qwen/qwen3.8-27b:free');
+  assert.equal(request.model, 'qwen/qwen3.8-27b');
   assert.ok(request.messages.some(message => message.role === 'user'));
 });
 
@@ -275,14 +275,14 @@ test('09 Description: змінений опис доходить до модел
   // Це перевірка доставки опису й доступності функції, а не слухняності живої моделі.
 });
 
-test('08 OpenRouter: HTTP tool call повертається наступним запитом із тим самим id', async () => {
+test('08 Groq: HTTP tool call повертається наступним запитом із тим самим id', async () => {
   const requests = [];
-  const router = createOpenRouter({ apiKey: 'offline-test-key', fetch: async (url, options) => {
-    assert.equal(String(url), 'https://openrouter.ai/api/v1/chat/completions');
+  const router = createGroq({ apiKey: 'offline-test-key', fetch: async (url, options) => {
+    assert.equal(String(url), 'https://api.groq.com/openai/v1/chat/completions');
     requests.push(JSON.parse(options.body));
     const first = requests.length === 1;
     return new Response(JSON.stringify({
-      id: 'offline', object: 'chat.completion', created: 1, model: 'qwen/qwen3.8-27b:free',
+      id: 'offline', object: 'chat.completion', created: 1, model: 'qwen/qwen3.8-27b',
       choices: [{ index: 0, finish_reason: first ? 'tool_calls' : 'stop', message: first ? {
         role: 'assistant', content: null, tool_calls: [{ id: 'router_1', type: 'function',
           function: { name: 'searchStories', arguments: '{"query":"harness"}' } }],
@@ -290,7 +290,7 @@ test('08 OpenRouter: HTTP tool call повертається наступним 
       usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
     }), { headers: { 'content-type': 'application/json' } });
   } });
-  const result = await runAgent(await agent({ model: router('qwen/qwen3.8-27b:free') }), 'Знайди harness');
+  const result = await runAgent(await agent({ model: router('qwen/qwen3.8-27b') }), 'Знайди harness');
   assert.equal(result.reason, 'final');
   assert.equal(result.text, 'Дві дискусії.');
   assert.equal(requests.length, 2);
@@ -325,10 +325,10 @@ async function rejectsEmptyTask(t, args) {
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const capture = join(temporary, 'requests.jsonl');
   const result = spawnSync(process.execPath, [
-    '--import', './test/openrouter.mock.mjs', '--import', 'tsx', 'src/main.ts', ...args,
+    '--import', './test/groq.mock.mjs', '--import', 'tsx', 'src/main.ts', ...args,
   ], {
     cwd: root, encoding: 'utf8', timeout: 15_000,
-    env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key', HARNESS_REQUESTS_PATH: capture },
+    env: { ...process.env, GROQ_API_KEY: 'offline-test-key', HARNESS_REQUESTS_PATH: capture },
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Помилка: передай задачу/);

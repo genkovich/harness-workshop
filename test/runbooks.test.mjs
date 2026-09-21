@@ -23,7 +23,7 @@ test('00 Підготовка: команда prepare створює .env і з�
   prepare();
   assert.equal(await readFile(join(temporary, '.env'), 'utf8'),
     await readFile(join(root, '.env.example'), 'utf8'));
-  const existing = 'OPENROUTER_API_KEY=offline-test-key\n';
+  const existing = 'GROQ_API_KEY=offline-test-key\n';
   await writeFile(join(temporary, '.env'), existing);
   prepare();
   assert.equal(await readFile(join(temporary, '.env'), 'utf8'), existing);
@@ -47,33 +47,38 @@ test('00 Ранбуки: усі теми, локальні посилання, �
   }
 });
 
-async function setupCheck(t, model) {
+async function setupCheck(t, model, apiKey = 'offline-test-key', responseStatus = 200) {
   const temporary = await mkdtemp(join(tmpdir(), 'harness-setup-'));
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const capture = join(temporary, 'request.jsonl');
   const result = spawnSync(process.execPath, [
-    '--import', './test/openrouter.mock.mjs', 'scripts/check-setup.mjs',
+    '--import', './test/groq.mock.mjs', 'scripts/check-setup.mjs',
   ], {
     cwd: root, encoding: 'utf8', timeout: 15_000,
-    env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key',
-      OPENROUTER_MODEL: model, HARNESS_SETUP_TEST: '1', HARNESS_REQUESTS_PATH: capture },
+    env: { ...process.env, GROQ_API_KEY: apiKey,
+      GROQ_MODEL: model, HARNESS_SETUP_TEST: '1', HARNESS_SETUP_STATUS: String(responseStatus), HARNESS_REQUESTS_PATH: capture },
   });
   assert.doesNotMatch(result.stdout + result.stderr, /offline-test-key/);
   return { result, capture };
 }
 
-test('00 API-підготовка: безкоштовна модель повертає коректний tool call', async (t) => {
-  const { result, capture } = await setupCheck(t, 'qwen/qwen3.8-27b:free');
+test('00 API-підготовка: Groq повертає коректний tool call', async (t) => {
+  const { result, capture } = await setupCheck(t, 'qwen/qwen3.8-27b');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /ключ працює; tool call отримано/);
   const requests = (await readFile(capture, 'utf8')).trim().split('\n');
   assert.equal(requests.length, 1);
-  assert.equal(JSON.parse(requests[0]).model, 'qwen/qwen3.8-27b:free');
+  assert.equal(JSON.parse(requests[0]).model, 'qwen/qwen3.8-27b');
 });
 
-test('00 API-підготовка: платний ID відхиляється до виклику моделі', async (t) => {
-  const { result, capture } = await setupCheck(t, 'paid/example');
+test('00 API-підготовка: порожній ключ і 429 не запускають прихованих повторів', async (t) => {
+  const { result, capture } = await setupCheck(t, 'qwen/qwen3.8-27b', '');
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /суфіксом :free/);
+  assert.match(result.stderr, /Встав GROQ_API_KEY/);
   await assert.rejects(() => readFile(capture), { code: 'ENOENT' });
+  const limited = await setupCheck(t, 'qwen/qwen3.8-27b', 'offline-test-key', 429);
+  assert.equal(limited.result.status, 1);
+  assert.match(limited.result.stderr, /Досягнуто ліміт Groq/);
+  assert.match(limited.result.stderr, /Retry-After: 30/);
+  assert.equal((await readFile(limited.capture, 'utf8')).trim().split('\n').length, 1);
 });
