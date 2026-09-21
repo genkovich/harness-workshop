@@ -1,12 +1,5 @@
 node_modules/
 .env
-.env.*
-!.env.example
-runs/
 .data/
-*.db
-*.db-shm
-*.db-wal
-notes.json
+runs/
 .DS_Store
-notes.json.tmp

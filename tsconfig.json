@@ -7,17 +7,13 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "types": [
       "node"
     ]
   },
   "include": [
-    "*.ts",
-    "scripts/**/*.ts",
-    "tests/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "day2"
+    "src",
+    "test"
   ]
 }

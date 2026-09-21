@@ -1,4 +1,4 @@
-name: Перевірка
+name: Check
 on: [push, pull_request, workflow_dispatch]
 jobs:
   check:
@@ -11,8 +11,3 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run demo -- smoke
-      - name: День 2
-        if: ${{ hashFiles('day2/package-lock.json') != '' }}
-        run: npm ci && npm run check
-        working-directory: day2
