@@ -72,7 +72,7 @@ if (reply.finishReason === 'length') {
 Тепер у src/main.ts лиши підключення моделі. Імпорти:
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { runAgent } from './harness.ts';
 ```
 
@@ -91,7 +91,7 @@ if (!task) {
 ```ts
 
 const result = await runAgent({
-  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+  model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system: 'Відповідай українською.',
 }, task);
 
@@ -196,7 +196,7 @@ export async function runAgent(agent: Agent, task: string) {
 <summary>src/main.ts</summary>
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { runAgent } from './harness.ts';
 
 const task = process.argv[2]?.trim();
@@ -209,7 +209,7 @@ try {
   const result = await runAgent(
     {
       system: 'Відповідай українською.',
-      model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+      model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
     },
     task,
   );

@@ -120,9 +120,9 @@ npm test -- --test-name-pattern "^0[0-2] "
 
 ```ts
 import { generateText, type ModelMessage } from 'ai';
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 
-const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free');
+const model = groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b');
 
 const task = process.argv[2]?.trim();
 if (!task) {

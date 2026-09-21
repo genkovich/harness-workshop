@@ -6,7 +6,7 @@
 
 ## Що робимо й навіщо
 
-Модель уже назвала тул та аргументи. Додаємо реальні функції: пошук і читання HN через fetch, запис дайджесту через node:fs/promises. HN Search не потребує ключів; ключ OpenRouter потрібен лише для моделі.
+Модель уже назвала тул та аргументи. Додаємо реальні функції: пошук і читання HN через fetch, запис дайджесту через node:fs/promises. HN Search не потребує ключів; ключ Groq потрібен лише для моделі.
 
 `fetch` вбудований у Node. `URLSearchParams` правильно кодує пробіли й спеціальні символи. `AbortSignal.timeout(15000)` обмежує очікування API. `parse` із Zod перевіряє вхід перед HTTP або записом. `mkdir` і `writeFile` — вбудовані функції Node. Додаткові пакети не встановлюємо.
 
@@ -317,7 +317,7 @@ export async function runAgent(agent: Agent, task: string) {
 <summary>src/news/agent.ts</summary>
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -346,7 +346,7 @@ const system = [
 
 // Модель, інструкція й тули належать конкретному агенту.
 export const news = {
-  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+  model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
