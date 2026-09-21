@@ -10,14 +10,14 @@
 
 `tool` із пакета `ai` оформлює назву, description та inputSchema. `z` із `zod` описує й перевіряє фактичні аргументи під час виконання. TypeScript перевіряє наш код; Zod — значення, отримані від моделі. `z.string().trim().min(1)` відхиляє порожній запит; `z.number().int().positive()` вимагає додатний цілий id. Номер теми модель бере з результату пошуку, а не вигадує. defaults 7 і 0 означають тиждень та першу порцію; сам запит та id обовʼязкові.
 
-`@openrouter/ai-sdk-provider` підключає вибрану модель до OpenRouter. Переносимо її разом із правилами й тулами в news: main.ts читає задачу, news визначає можливості агента, harness.ts керує запитами. [AI SDK tools](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) · [Zod](https://zod.dev/basics).
+`@ai-sdk/groq` підключає вибрану модель до Groq. Переносимо її разом із правилами й тулами в news: main.ts читає задачу, news визначає можливості агента, harness.ts керує запитами. [AI SDK tools](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) · [Zod](https://zod.dev/basics).
 
 ## Маленькі зміни
 
 Створи папку src/news і файл agent.ts. Почни з імпортів:
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { tool } from 'ai';
 import { z } from 'zod';
 ```
@@ -60,7 +60,7 @@ const system = [
 
 ```ts
 export const news = {
-  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+  model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
   tools: {
     // Додай сюди три описи нижче.
@@ -95,7 +95,7 @@ export const news = {
     }),
 ```
 
-У main.ts прибери імпорт openrouter, додай імпорт news і заміни обʼєкт налаштувань у runAgent:
+У main.ts прибери імпорт groq, додай імпорт news і заміни обʼєкт налаштувань у runAgent:
 
 ```ts
 import { news } from './news/agent.ts';
@@ -181,7 +181,7 @@ try {
 <summary>src/news/agent.ts</summary>
 
 ```ts
-import { openrouter } from '@openrouter/ai-sdk-provider';
+import { groq } from '@ai-sdk/groq';
 import { tool } from 'ai';
 import { z } from 'zod';
 
@@ -208,7 +208,7 @@ const system = [
 
 // Модель, інструкція й тули належать конкретному агенту.
 export const news = {
-  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
+  model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
