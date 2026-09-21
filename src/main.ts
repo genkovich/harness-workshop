@@ -5,7 +5,7 @@ const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'
 
 const task = process.argv[2]?.trim();
 if (!task) {
-  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."');
   process.exit(1);
 }
 const messages: ModelMessage[] = [{ role: 'user', content: task }];
