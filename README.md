@@ -1,25 +1,66 @@
 # Harness Workshop · день 1
 
-**[Почни з порожньої папки → RUNBOOK.md](RUNBOOK.md#setup)**
+Підготовлена основа; під час практики змінюємо лише `src/`.
+`package.json`, lockfile, tsconfig, тести, AGENTS.md і skill уже готові.
 
-Створюємо папку й перший файл, підключаємо модель через OpenRouter, додаємо тули й поступово збираємо цикл. Ранбук містить код для кожної зміни, команди запуску, очікувані результати та дебаг. Усі кроки можна пройти у власній гілці `work`.
+Перед практикою:
 
-Гілки цього репозиторію — контрольні точки, щоб звіритися або наздогнати групу. [Як перейти до контрольної точки, зберігши свій код](RUNBOOK.md#checkpoints).
+```bash
+git clone --branch start https://github.com/genkovich/harness-workshop.git
+cd harness-workshop
+npm ci
+git switch -c work
+```
 
-| Крок ранбуку | Контрольна точка |
+`npm ci` створює `.env` із шаблону, якщо файла ще немає. Наявний `.env` зберігається.
+Один раз перед заняттям встав свій OPENROUTER_API_KEY. Для живих викликів потрібен баланс OpenRouter; ключ не комітимо.
+
+```bash
+npm run check
+npm start
+```
+
+Очікуємо «TypeScript працює». Далі відкрий [етап 01](https://github.com/genkovich/harness-workshop/blob/step-01-model/RUNBOOK.md) і продовжуй у work.
+Кожен ранбук містить лише поточну зміну, короткі фрагменти коду, запуск і дебаг.
+Тести готові: на етапі копіюй команду з його ранбуку. Повний npm test перевіряє фінальне рішення.
+
+## Контрольні точки
+
+| Етап | Ранбук і готовий код |
 |---|---|
-| 0–2 · папка, TypeScript, модель, перший тест | Пишемо з нуля |
-| 3 · додаємо billing | start |
-| 4 · описи тулів | step-1-request |
-| 5 · виконання й результат | step-2-tools |
-| 6 · повторення й ліміт | step-3-loop |
-| 7 · експеримент з описом | step-4-description |
-| 8 · AGENTS.md | step-5-context |
-| 9 · skills | step-6-skills |
-| 10 · дозвіл | step-7-guard / main |
+| 01 · Один запит | [step-01-model](https://github.com/genkovich/harness-workshop/blob/step-01-model/RUNBOOK.md) |
+| 02 · Повідомлення | [step-02-messages](https://github.com/genkovich/harness-workshop/blob/step-02-messages/RUNBOOK.md) |
+| 03 · Функція запиту | [step-03-function](https://github.com/genkovich/harness-workshop/blob/step-03-function/RUNBOOK.md) |
+| 04 · Описи тулів | [step-04-tools](https://github.com/genkovich/harness-workshop/blob/step-04-tools/RUNBOOK.md) |
+| 05 · Tool call | [step-05-call](https://github.com/genkovich/harness-workshop/blob/step-05-call/RUNBOOK.md) |
+| 06 · Виконання | [step-06-execute](https://github.com/genkovich/harness-workshop/blob/step-06-execute/RUNBOOK.md) |
+| 07 · Результат в історії | [step-07-history](https://github.com/genkovich/harness-workshop/blob/step-07-history/RUNBOOK.md) |
+| 08 · Цикл і зупинка | [step-08-loop](https://github.com/genkovich/harness-workshop/blob/step-08-loop/RUNBOOK.md) |
+| 09 · Експеримент з описом | [step-09-description](https://github.com/genkovich/harness-workshop/blob/step-09-description/RUNBOOK.md) |
+| 10 · Правила з файла | [step-10-context](https://github.com/genkovich/harness-workshop/blob/step-10-context/RUNBOOK.md) |
+| 11 · Skills | [step-11-skills](https://github.com/genkovich/harness-workshop/blob/step-11-skills/RUNBOOK.md) |
+| 12 · Дозвіл | [step-12-guard](https://github.com/genkovich/harness-workshop/blob/step-12-guard/RUNBOOK.md) |
 
-Node 22.19+. Для живих запусків: OPENROUTER_API_KEY у `.env` і баланс для обраної моделі. Модель задана одним рядком у `src/main.ts`; налаштування є в ранбуку. `npm run check` працює без API-ключа.
+## Якщо треба наздогнати
 
-Чотири TypeScript-файли у готовому рішенні: запуск `src/main.ts`, цикл `src/harness.ts`, предметна логіка `src/billing/agent.ts`, читання skills `src/skills.ts`. SendReply записує `.data/outbox.jsonl`.
+Збережи свій код і відкрий потрібну точку, наприклад результат виконання тула:
 
-**Ця гілка: `start`.** Один запит і модуль billing; тули ще не передані моделі. [Відповідний крок ранбуку](RUNBOOK.md#start).
+```bash
+git add src
+git commit -m "Моя практика"
+git switch -c continue-execute origin/step-06-execute
+npm run check
+```
+
+Якщо змін немає, commit пропусти. Далі відкрий ранбук етапу 07 у браузері й пиши у своїй гілці.
+Після кожного кроку перемикатися не потрібно. Навчальні дані, тести й конфігурація однакові у всіх точках.
+
+Для дебагу: TRACE=1 npm start показує HTTP body. У циклі перевір reply.toolCalls, call.toolCallId і messages.
+
+```bash
+node --inspect-brk --import tsx --env-file-if-exists=.env src/main.ts
+```
+
+У VS Code обери Debug: Attach to Node Process. Постав breakpoint після generateText, перед runTool і після messages.push. Процес очікує підключення дебагера; Ctrl+C його завершує.
+
+**Ця точка:** start — Заготовка.

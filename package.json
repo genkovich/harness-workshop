@@ -7,8 +7,9 @@
   },
   "scripts": {
     "start": "tsx --env-file-if-exists=.env src/main.ts",
-    "test": "node --import tsx --test --experimental-test-isolation=none --test-reporter=spec test/harness.test.ts",
-    "check": "tsc --noEmit && npm test"
+    "test": "node --import tsx --test --experimental-test-isolation=none --test-reporter=spec",
+    "check": "tsc --noEmit",
+    "prepare": "node -e \"const fs = require('node:fs'); if (!fs.existsSync('.env')) fs.copyFileSync('.env.example', '.env');\""
   },
   "dependencies": {
     "@openrouter/ai-sdk-provider": "3.1.0",
