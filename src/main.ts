@@ -3,7 +3,11 @@ import { openrouter } from '@openrouter/ai-sdk-provider';
 
 const model = openrouter('openai/gpt-oss-20b');
 
-const task = process.argv[2] || 'Перевір списання клієнта 42.';
+const task = process.argv[2]?.trim();
+if (!task) {
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  process.exit(1);
+}
 const messages: ModelMessage[] = [{ role: 'user', content: task }];
 
 const reply = await generateText({
