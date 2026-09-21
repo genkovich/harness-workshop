@@ -1,19 +1,22 @@
-import { generateText, type ModelMessage } from 'ai';
 import { openrouter } from '@openrouter/ai-sdk-provider';
+import { runAgent } from './harness.ts';
 
-const model = openrouter('openai/gpt-oss-20b');
+const task =
+  process.argv[2] ||
+  'Клієнт 42: за вересень двічі списали гроші. Перевір і дай відповідь.';
 
-const task = process.argv[2] || 'Перевір списання клієнта 42.';
-const messages: ModelMessage[] = [{ role: 'user', content: task }];
+try {
+  const result = await runAgent(
+    {
+      system: 'Відповідай українською.',
+      model: openrouter('openai/gpt-oss-20b'),
+    },
+    task,
+  );
 
-const reply = await generateText({
-  model,
-  system: 'Відповідай українською.',
-  messages,
-  maxRetries: 0,
-  maxOutputTokens: 1200,
-  abortSignal: AbortSignal.timeout(60_000),
-});
-
-console.log('Причина завершення:', reply.finishReason);
-console.log('Відповідь:', reply.text);
+  if (result.text) console.log(`\nВідповідь: ${result.text}`);
+  if (result.reason === 'limit') process.exitCode = 2;
+} catch (error) {
+  console.error('Помилка:', error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+}

@@ -63,4 +63,4 @@ node --inspect-brk --import tsx --env-file-if-exists=.env src/main.ts
 
 У VS Code обери Debug: Attach to Node Process. Постав breakpoint після generateText, перед runTool і після messages.push. Процес очікує підключення дебагера; Ctrl+C його завершує.
 
-**Ця точка:** step-02-messages — Повідомлення.
+**Ця точка:** step-03-function — Функція запиту.
