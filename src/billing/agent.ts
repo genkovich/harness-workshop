@@ -1,3 +1,4 @@
+import { openrouter } from '@openrouter/ai-sdk-provider';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { tool } from 'ai';
@@ -9,12 +10,20 @@ const chargesInput = z.object({ customerId });
 const replyInput = z.object({ customerId, text: z.string().min(1).max(4000) });
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 
+const system = [
+  'Роль: ти агент підтримки з питань списань.',
+  'Мета: перевір факти й поясни клієнту результат.',
+  'Дані: списання отримуй через getCharges; не вигадуй їх.',
+  'Відповідь: після перевірки використовуй sendReply.',
+  'Уточнення: якщо номера клієнта немає, попроси його.',
+  'Межі: не обіцяй повернення коштів; такого тула немає.',
+  'Мова: українська.',
+].join('\n');
+
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  system:
-    'Ти агент підтримки. Перевір списання через getCharges, ' +
-    'потім відповідай через sendReply. ' +
-    'Якщо дію заблоковано, попроси дозвіл.',
+  model: openrouter('openai/gpt-oss-20b'),
+  system,
   context: rules,
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
