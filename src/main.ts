@@ -11,7 +11,7 @@ try {
   const result = await runAgent(
     {
       system: 'Відповідай українською.',
-      model: openrouter('openai/gpt-oss-20b'),
+      model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
     },
     task,
   );

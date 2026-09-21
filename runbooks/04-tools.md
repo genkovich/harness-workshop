@@ -68,7 +68,7 @@ const system = [
 
 ```ts
 export const billing = {
-  model: openrouter('openai/gpt-oss-20b'),
+  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
   system,
   tools: {
     // Тут будуть два описи нижче.
@@ -116,7 +116,7 @@ npm test -- --test-name-pattern "^0[0-4] "
 npm start -- "Перевір списання клієнта 42."
 ```
 
-**Автоматична перевірка:** 8 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 10 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Описи існують у нашому обʼєкті; у TRACE tools ще немає. Наступним кроком передамо їх моделі.
 
@@ -176,7 +176,7 @@ const system = [
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  model: openrouter('openai/gpt-oss-20b'),
+  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
   system,
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
