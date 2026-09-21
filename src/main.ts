@@ -3,7 +3,7 @@ import { runAgent } from './harness.ts';
 
 const task = process.argv[2]?.trim();
 if (!task) {
-  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."');
   process.exit(1);
 }
 

@@ -1,4 +1,4 @@
-import { test, mock } from "node:test";
+import { test, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,8 +14,8 @@ async function runAgent(options, task) {
   return runAgent2(options, task);
 }
 async function agent(options) {
-  const { billing } = await import("../src/billing/agent.ts");
-  return { ...billing, ...options };
+  const { news } = await import("../src/news/agent.ts");
+  return { ...news, ...options };
 }
 function reply(content) {
   return {
@@ -46,73 +46,63 @@ test("03 Запит: Текстова відповідь завершує роб
   assert.equal(model.doGenerateCalls.length, 1);
   assert.equal(model.doGenerateCalls[0].prompt.at(-1)?.role, "user");
 });
-test("05 Описи: модель отримує схему getCharges", async () => {
+test("05 Описи: модель отримує схему searchStories", async () => {
   const model = new MockLanguageModelV3({
-    doGenerate: [reply([call("getCharges", { customerId: 42 })]), final]
+    doGenerate: [reply([call("searchStories", { query: "harness" })]), final]
   });
   await runAgent(await agent({ model }), "Перевір");
-  const tool = model.doGenerateCalls[0].tools.find((tool2) => tool2.name === "getCharges");
+  const tool = model.doGenerateCalls[0].tools.find((tool2) => tool2.name === "searchStories");
   assert.ok(tool);
-  assert.equal(tool.inputSchema.properties.customerId.type, "integer");
+  assert.equal(tool.inputSchema.properties.query.type, "string");
 });
-test("06 Виконання: getCharges читає дані, аргументи перевіряються", async () => {
-  const { billing } = await import("../src/billing/agent.ts");
-  const charges = await billing.runTool("getCharges", { customerId: 42 });
-  assert.deepEqual(charges.map((charge) => charge.id), ["ch_01", "ch_02"]);
-  await assert.rejects(() => billing.runTool("getCharges", { customerId: "42" }));
+test("06 Виконання: searchStories повертає теми, аргументи перевіряються", async () => {
+  const { news } = await import("../src/news/agent.ts");
+  const stories = await news.runTool("searchStories", { query: "harness" });
+  assert.deepEqual(stories.map(story => story.id), [101, 102]);
+  await assert.rejects(() => news.runTool("searchStories", { query: 42 }));
 });
 test("07 Історія: результат повертається з id виклику", async () => {
   const model = new MockLanguageModelV3({
-    doGenerate: [reply([call("getCharges", { customerId: 42 }, "id-42")]), final]
+    doGenerate: [reply([call("searchStories", { query: "harness" }, "id-42")]), final]
   });
   const result = await runAgent(await agent({ model }), "Перевір");
   const message = result.messages.find((message2) => message2.role === "tool");
   assert.ok(message);
   assert.equal(message.content[0].toolCallId, "id-42");
-  assert.match(JSON.stringify(message), /ch_02/);
+  assert.match(JSON.stringify(message), /102/);
 });
-test("08 Цикл: Два тули: історія 1 → 3 → 5, відповідь записана рівно один раз", async (t) => {
+test("08 Цикл: пошук → читання → запис, історія 1 → 3 → 5 → 7", async (t) => {
   const originalDirectory = process.cwd();
-  const directory = await mkdtemp(join(tmpdir(), "harness-"));
+  const directory = await mkdtemp(join(tmpdir(), "harness-digest-"));
   process.chdir(directory);
-  t.after(() => process.chdir(originalDirectory));
-  const model = new MockLanguageModelV3({
-    doGenerate: [
-      reply([call("getCharges", { customerId: 42 })]),
-      reply([
-        call("sendReply", { customerId: 42, text: "Два списання по $49." }, "call_2")
-      ]),
-      final
-    ]
-  });
-  const result = await runAgent(
-    await agent({ model, beforeTool: () => null }),
-    "Перевір списання"
-  );
-  assert.equal(result.reason, "final");
-  const histories = model.doGenerateCalls.map(
-    (request) => request.prompt.filter((m) => m.role !== "system")
-  );
-  assert.deepEqual(
-    histories.map((messages) => messages.length),
-    [1, 3, 5]
-  );
-  assert.equal(JSON.stringify(histories[1]).includes("call_1"), true);
-  const lines = (await readFile(".data/outbox.jsonl", "utf8")).trim().split("\n");
-  assert.equal(lines.length, 1);
-  assert.equal(JSON.parse(lines[0]).customerId, 42);
+  t.after(async () => { process.chdir(originalDirectory); await rm(directory, { recursive: true, force: true }); });
+  const text = 'Огляд обговорень HN\n[Дискусія](https://news.ycombinator.com/item?id=101)';
+  const model = new MockLanguageModelV3({ doGenerate: [
+    reply([call('searchStories', { query: 'harness' })]),
+    reply([call('readDiscussion', { id: 101 }, 'call_2')]),
+    reply([call('saveDigest', { text }, 'call_3')]), final,
+  ] });
+  const options = await agent({ model, beforeTool: () => null });
+  const runTool = options.runTool;
+  const executed = [];
+  options.runTool = async (name, input) => { executed.push(name); return runTool(name, input); };
+  const result = await runAgent(options, 'Досліди та збережи');
+  assert.equal(result.reason, 'final');
+  assert.deepEqual(model.doGenerateCalls.map(request => request.prompt.filter(m => m.role !== 'system').length), [1, 3, 5, 7]);
+  assert.deepEqual(executed, ['searchStories', 'readDiscussion', 'saveDigest']);
+  assert.equal(await readFile('.data/digest.md', 'utf8'), text + '\n');
 });
 test("08 Кілька тулів: Кілька викликів отримують результати зі своїми id", async () => {
   const model = new MockLanguageModelV3({
     doGenerate: [
       reply([
-        call("getCharges", { customerId: 42 }, "a"),
-        call("getCharges", { customerId: 7 }, "b")
+        call("searchStories", { query: "harness" }, "a"),
+        call("searchStories", { query: "agents" }, "b")
       ]),
       final
     ]
   });
-  await runAgent(await agent({ model }), "Два клієнти");
+  await runAgent(await agent({ model }), "Два пошукові запити");
   const results = model.doGenerateCalls[1].prompt.filter(
     (message) => message.role === "tool"
   );
@@ -125,7 +115,7 @@ test("08 Кілька тулів: Кілька викликів отримуют
 });
 test("08 Ліміт: Ліміт зупиняє модель, яка знову просить той самий тул", async () => {
   const model = new MockLanguageModelV3({
-    doGenerate: reply([call("getCharges", { customerId: 42 })])
+    doGenerate: reply([call("searchStories", { query: "harness" })])
   });
   const result = await runAgent(await agent({ model, maxSteps: 2 }), "Повторюй");
   assert.equal(result.reason, "limit");
@@ -133,7 +123,7 @@ test("08 Ліміт: Ліміт зупиняє модель, яка знову �
 });
 test("08 Помилка: Некоректні аргументи й невідомий тул повертають помилку в контекст", async () => {
   for (const toolCall of [
-    call("getCharges", { customerId: "42" }),
+    call("searchStories", { query: 42 }),
     call("unknown", {})
   ]) {
     const model = new MockLanguageModelV3({ doGenerate: [reply([toolCall]), final] });
@@ -145,7 +135,7 @@ test("08 Помилка: Некоректні аргументи й невідо
   }
 });
 test("08 Обрізання: Обрізані аргументи не доходять до виконання", async () => {
-  const truncated = reply([call("getCharges", { customerId: 42 })]);
+  const truncated = reply([call("searchStories", { query: "harness" })]);
   truncated.finishReason = { unified: "length", raw: "length" };
   const model = new MockLanguageModelV3({ doGenerate: truncated });
   let executed = false;
@@ -156,22 +146,22 @@ test("08 Обрізання: Обрізані аргументи не доход
 test("10 Контекст: AGENTS.md зʼявляється в першому повідомленні", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
   await runAgent(await agent({ model }), "Перевір");
-  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Дякуємо за звернення/);
+  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Огляд обговорень HN/);
 });
 test("11 Skills: Спершу опис skill, повний текст лише після readSkill", async () => {
   const model = new MockLanguageModelV3({
-    doGenerate: [reply([call("readSkill", { name: "billing" })]), final]
+    doGenerate: [reply([call("readSkill", { name: "digest" })]), final]
   });
-  await runAgent(await agent({ model }), "Прочитай billing");
+  await runAgent(await agent({ model }), "Прочитай digest");
   assert.doesNotMatch(
     JSON.stringify(model.doGenerateCalls[0].prompt),
-    /Перевір дати, суми/
+    /Для пошуку спробуй англомовні запити/
   );
-  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /Перевір дати, суми/);
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /Для пошуку спробуй англомовні запити/);
   const { readSkill } = await import("../src/skills.ts");
   assert.throws(() => readSkill("../../.env"), /Невідомий skill/);
 });
-test("12 Дозвіл: Без дозволу sendReply не створює outbox, модель бачить блокування", async (t) => {
+test("12 Дозвіл: Без дозволу saveDigest не створює digest.md, модель бачить блокування", async (t) => {
   const originalDirectory = process.cwd();
   const approved = process.env.APPROVED;
   process.chdir(await mkdtemp(join(tmpdir(), "harness-blocked-")));
@@ -183,16 +173,38 @@ test("12 Дозвіл: Без дозволу sendReply не створює outbo
   });
   const model = new MockLanguageModelV3({
     doGenerate: [
-      reply([call("sendReply", { customerId: 42, text: "Відповідь" })]),
+      reply([call("saveDigest", { text: "Відповідь" })]),
       final
     ]
   });
   await runAgent(await agent({ model }), "Надішли");
-  await assert.rejects(() => readFile(".data/outbox.jsonl"), { code: "ENOENT" });
+  await assert.rejects(() => readFile(".data/digest.md"), { code: "ENOENT" });
   assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /blocked, ask the user/);
 });
 
 // Перші етапи теж перевіряємо виконанням коду, а не пошуком рядків у src.
+// Лише навчальні дані. Жодний тест не звертається до живого Hacker News.
+const fixture = {
+  hits: [101, 102].map(id => ({ objectID: String(id), title: `Harness fixture ${id}`,
+    url: 'https://example.org/fixture', points: 10, num_comments: 2,
+    created_at: '2026-09-21T10:00:00Z' })),
+};
+function discussion(id = 101) {
+  return { id, type: 'story', title: 'Навчальна дискусія', children: [
+    { id: 201, author: 'test-author', text: 'Перевіряйте результати тулів.', children: [
+      { id: 202, author: 'other-author', text: 'Самих тестів недостатньо.', children: [] },
+    ] },
+  ] };
+}
+beforeEach(t => {
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const address = new URL(url);
+    assert.equal(address.origin, 'https://hn.algolia.com', 'Неочікуваний мережевий виклик');
+    if (address.pathname === '/api/v1/search_by_date') return Response.json(fixture);
+    if (address.pathname.startsWith('/api/v1/items/')) return Response.json(discussion(Number(address.pathname.split('/').at(-1))));
+    throw new Error('Неочікуваний API endpoint');
+  });
+});
 const root = fileURLToPath(new URL('../', import.meta.url));
 
 async function runEntry(t, task) {
@@ -227,16 +239,19 @@ test('02 Повідомлення: задача з CLI потрапляє до u
   assert.ok(JSON.stringify(user.content).includes(task));
 });
 
-test('04 Описи: дві схеми перевіряють аргументи, execute не підключений', async () => {
-  const { billing } = await import('../src/billing/agent.ts');
-  const { getCharges, sendReply } = billing.tools;
-  assert.equal(getCharges.execute, undefined);
-  assert.equal(sendReply.execute, undefined);
-  assert.ok(getCharges.description.length > 0);
-  assert.ok(sendReply.description.length > 0);
-  assert.equal(getCharges.inputSchema.safeParse({ customerId: 42 }).success, true);
-  assert.equal(getCharges.inputSchema.safeParse({ customerId: '42' }).success, false);
-  assert.equal(sendReply.inputSchema.safeParse({ customerId: 42, text: '' }).success, false);
+test('04 Описи: три схеми перевіряють аргументи, execute не підключений', async () => {
+  const { news } = await import('../src/news/agent.ts');
+  const { searchStories, readDiscussion, saveDigest } = news.tools;
+  assert.equal(readDiscussion.execute, undefined);
+  assert.equal(readDiscussion.inputSchema.safeParse({ id: 101 }).success, true);
+  assert.equal(readDiscussion.inputSchema.safeParse({ id: "101" }).success, false);
+  assert.equal(searchStories.execute, undefined);
+  assert.equal(saveDigest.execute, undefined);
+  assert.ok(searchStories.description.length > 0);
+  assert.ok(saveDigest.description.length > 0);
+  assert.equal(searchStories.inputSchema.safeParse({ query: "harness" }).success, true);
+  assert.equal(searchStories.inputSchema.safeParse({ query: 42 }).success, false);
+  assert.equal(saveDigest.inputSchema.safeParse({ text: '' }).success, false);
 });
 
 test('09 Description: змінений опис доходить до моделі, виконання лишається доступним', async (t) => {
@@ -247,16 +262,16 @@ test('09 Description: змінений опис доходить до модел
     process.chdir(originalDirectory);
     await rm(temporary, { recursive: true, force: true });
   });
-  const { billing } = await import('../src/billing/agent.ts');
+  const { news } = await import('../src/news/agent.ts');
   const model = new MockLanguageModelV3({ doGenerate: [
-    reply([call('sendReply', { customerId: 42, text: 'Перевірка опису' })]), final,
+    reply([call('saveDigest', { text: 'Перевірка опису' })]), final,
   ] });
   await runAgent(await agent({ model, beforeTool: () => null, tools: {
-    ...billing.tools, sendReply: { ...billing.tools.sendReply, description: 'never call this' },
+    ...news.tools, saveDigest: { ...news.tools.saveDigest, description: 'never call this' },
   } }), 'Перевір опис');
-  const sent = model.doGenerateCalls[0].tools.find(tool => tool.name === 'sendReply');
+  const sent = model.doGenerateCalls[0].tools.find(tool => tool.name === 'saveDigest');
   assert.equal(sent.description, 'never call this');
-  assert.equal(JSON.parse((await readFile('.data/outbox.jsonl', 'utf8')).trim()).customerId, 42);
+  assert.equal((await readFile('.data/digest.md', 'utf8')).trim(), 'Перевірка опису');
   // Це перевірка доставки опису й доступності функції, а не слухняності живої моделі.
 });
 
@@ -270,22 +285,22 @@ test('08 OpenRouter: HTTP tool call повертається наступним 
       id: 'offline', object: 'chat.completion', created: 1, model: 'qwen/qwen3.8-27b:free',
       choices: [{ index: 0, finish_reason: first ? 'tool_calls' : 'stop', message: first ? {
         role: 'assistant', content: null, tool_calls: [{ id: 'router_1', type: 'function',
-          function: { name: 'getCharges', arguments: '{"customerId":42}' } }],
-      } : { role: 'assistant', content: 'Два списання.' } }],
+          function: { name: 'searchStories', arguments: '{"query":"harness"}' } }],
+      } : { role: 'assistant', content: 'Дві дискусії.' } }],
       usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
     }), { headers: { 'content-type': 'application/json' } });
   } });
-  const result = await runAgent(await agent({ model: router('qwen/qwen3.8-27b:free') }), 'Перевір 42');
+  const result = await runAgent(await agent({ model: router('qwen/qwen3.8-27b:free') }), 'Знайди harness');
   assert.equal(result.reason, 'final');
-  assert.equal(result.text, 'Два списання.');
+  assert.equal(result.text, 'Дві дискусії.');
   assert.equal(requests.length, 2);
-  assert.ok(requests[0].tools.some(tool => tool.function.name === 'getCharges'));
+  assert.ok(requests[0].tools.some(tool => tool.function.name === 'searchStories'));
   const toolResult = requests[1].messages.find(message => message.role === 'tool');
   assert.equal(toolResult.tool_call_id, 'router_1');
-  assert.equal(JSON.parse(toolResult.content)[1].id, 'ch_02');
+  assert.equal(JSON.parse(toolResult.content)[1].id, 102);
 });
 
-test('12 Дозвіл: APPROVED=1 дозволяє рівно один запис відповіді', async (t) => {
+test('12 Дозвіл: APPROVED=1 дозволяє зберегти дайджест', async (t) => {
   const originalDirectory = process.cwd();
   const approved = process.env.APPROVED;
   const temporary = await mkdtemp(join(tmpdir(), 'harness-approved-'));
@@ -298,13 +313,11 @@ test('12 Дозвіл: APPROVED=1 дозволяє рівно один запи�
     await rm(temporary, { recursive: true, force: true });
   });
   const model = new MockLanguageModelV3({ doGenerate: [
-    reply([call('sendReply', { customerId: 42, text: 'Дозволено' })]), final,
+    reply([call('saveDigest', { text: 'Дозволено' })]), final,
   ] });
   const result = await runAgent(await agent({ model }), 'Надішли');
   assert.equal(result.reason, 'final');
-  const lines = (await readFile('.data/outbox.jsonl', 'utf8')).trim().split('\n');
-  assert.equal(lines.length, 1);
-  assert.equal(JSON.parse(lines[0]).text, 'Дозволено');
+  assert.equal((await readFile('.data/digest.md', 'utf8')).trim(), 'Дозволено');
 });
 
 async function rejectsEmptyTask(t, args) {
@@ -330,4 +343,84 @@ test('02 Ввід: без аргументу помилка, запит до API
 test('02 Ввід: порожній рядок і пробіли відхиляються до виклику API', async (t) => {
   await rejectsEmptyTask(t, ['']);
   await rejectsEmptyTask(t, ['   ']);
+});
+
+
+test('06 HN: пошук передає запит, період і обмеження, повертає посилання', async (t) => {
+  let address;
+  t.mock.method(globalThis, 'fetch', async url => { address = new URL(url); return Response.json(fixture); });
+  const { news } = await import('../src/news/agent.ts');
+  const result = await news.runTool('searchStories', { query: 'tool calling', days: 3 });
+  assert.equal(address.searchParams.get('query'), 'tool calling');
+  assert.equal(address.searchParams.get('hitsPerPage'), '10');
+  const since = Number(/created_at_i>(\d+)/.exec(address.searchParams.get('numericFilters'))[1]);
+  assert.ok(Math.abs(since - (Math.floor(Date.now() / 1000) - 3 * 86400)) < 2);
+  assert.equal(result[0].url, 'https://news.ycombinator.com/item?id=101');
+  for (const input of [{query: ' '}, {query:'agents',days:0}, {query:'agents',days:31}]) {
+    await assert.rejects(() => news.runTool('searchStories', input));
+  }
+});
+
+test('06 HN: порції коментарів, батьківські id й ознака обрізання', async (t) => {
+  const tree = discussion();
+  tree.children = Array.from({length: 11}, (_, i) => ({ id: 200+i, text: 'x'.repeat(1200), children: [] }));
+  tree.children.push({id:999,text:null,children:[]});
+  t.mock.method(globalThis, 'fetch', async () => Response.json(tree));
+  const { news } = await import('../src/news/agent.ts');
+  const first = await news.runTool('readDiscussion', { id: 101 });
+  const second = await news.runTool('readDiscussion', { id: 101, offset: first.nextOffset });
+  assert.equal(first.comments.length, 10);
+  assert.equal(first.comments[0].parentId, 101);
+  assert.equal(first.comments[0].text.length, 1000);
+  assert.equal(first.comments[0].truncated, true);
+  assert.equal(first.nextOffset, 10);
+  assert.equal(second.comments.length, 1);
+  assert.equal(second.nextOffset, null);
+  assert.equal(first.totalComments, 11);
+  assert.equal((await news.runTool('readDiscussion', {id:101,offset:100})).nextOffset, null);
+  await assert.rejects(() => news.runTool('readDiscussion', {id:101,offset:-1}));
+});
+
+test('06 HN: вкладені відповіді зберігають parentId і порядок', async () => {
+  const { news } = await import('../src/news/agent.ts');
+  const result = await news.runTool('readDiscussion', {id:101});
+  assert.deepEqual(result.comments.map(c => [c.id,c.parentId]), [[201,101],[202,201]]);
+});
+
+test('06 HN: порожній пошук та дискусія без коментарів — коректні результати', async (t) => {
+  t.mock.method(globalThis, 'fetch', async url => Response.json(String(url).includes('search_by_date') ? {hits:[]} : {id:101,type:'story',children:[]}));
+  const { news } = await import('../src/news/agent.ts');
+  assert.deepEqual(await news.runTool('searchStories', {query:'unknown'}), []);
+  const result = await news.runTool('readDiscussion', {id:101});
+  assert.deepEqual(result.comments, []);
+  assert.equal(result.nextOffset, null);
+});
+
+test('06 HN: HTTP, timeout, null і невірний тип повертають зрозумілу помилку', async (t) => {
+  const { news } = await import('../src/news/agent.ts');
+  for (const [fetch, pattern] of [
+    [async () => new Response('',{status:429}), /HTTP 429/],
+    [async () => {throw new Error('timeout');}, /timeout/],
+    [async () => Response.json(null), /порожня відповідь/],
+    [async () => Response.json({type:'comment'}), /id обговорення/],
+  ]) {
+    t.mock.method(globalThis, 'fetch', fetch);
+    await assert.rejects(() => news.runTool('readDiscussion', {id:101}), pattern);
+  }
+});
+
+test('08 HN: помилка API доходить до моделі; наступний виклик може змінити запит', async (t) => {
+  const queries=[];
+  t.mock.method(globalThis, 'fetch', async url => {
+    queries.push(new URL(url).searchParams.get('query'));
+    return queries.length === 1 ? new Response('',{status:503}) : Response.json(fixture);
+  });
+  const model = new MockLanguageModelV3({doGenerate:[
+    reply([call('searchStories',{query:'harness'},'first')]),
+    reply([call('searchStories',{query:'coding agents'},'second')]), final,
+  ]});
+  await runAgent(await agent({model}), 'Знайди дискусії');
+  assert.deepEqual(queries,['harness','coding agents']);
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /HTTP 503/);
+  assert.match(JSON.stringify(model.doGenerateCalls[2].prompt), /Harness fixture/);
 });
