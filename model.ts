@@ -29,6 +29,7 @@ export async function callModel(messages: ModelMessage[], tools: ToolSet, log: L
   log({ event: 'request', step, provider: process.env.PROVIDER || 'groq', model: model.modelId, messagesCount: messages.length, system: SYSTEM, messages });
   // Один generateText. SDK не отримує execute і не тримає агентний цикл.
   const reply = await withRetry(() => generateText({ model, system: SYSTEM, messages, tools,
+    include: { requestBody: true, responseBody: true },
     maxRetries: 0, maxOutputTokens: 1200, abortSignal: AbortSignal.timeout(60_000) }),
     ms => log({ event: 'retry', step, waitMs: ms }));
   // Тіло реального запиту SDK: без заголовків авторизації.
