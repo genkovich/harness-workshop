@@ -12,9 +12,9 @@
 
 `ai` — пакет **AI SDK від Vercel**. Його функція `generateText` приймає модель, задачу й налаштування, робить виклик через адаптер та повертає текст, причину завершення й можливі tool calls. У цій практиці повторення запитів пишемо власним циклом. [Документація generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
 
-`@openrouter/ai-sdk-provider` — **адаптер OpenRouter для AI SDK**. OpenRouter — сервіс доступу до моделей через спільний API. Адаптер перекладає запит SDK у формат цього API. `openrouter('openai/gpt-oss-20b')` створює обʼєкт вибраної моделі; мережевий запит відбудеться у `generateText`. Ключ читається з `OPENROUTER_API_KEY`. [Офіційний пакет](https://github.com/OpenRouterTeam/ai-sdk-provider).
+`@openrouter/ai-sdk-provider` — **адаптер OpenRouter для AI SDK**. OpenRouter — сервіс доступу до моделей через спільний API. Адаптер перекладає запит SDK у формат цього API. `openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free')` створює обʼєкт вибраної моделі; мережевий запит відбудеться у `generateText`. Ключ читається з `OPENROUTER_API_KEY`. [Офіційний пакет](https://github.com/OpenRouterTeam/ai-sdk-provider).
 
-Звʼязок у нашому коді: `generateText` → адаптер OpenRouter → API → відповідь. Обидва пакети вже встановлені через npm ci.
+Звʼязок у нашому коді: `generateText` → адаптер OpenRouter → API → відповідь. Обидва пакети вже встановлені через npm ci. OPENROUTER_MODEL читає вибраний у підготовці ID з .env; якщо значення порожнє, використовуємо перевірений безкоштовний ID із прикладу. Суфікс :free зберігаємо. Умови доступу й ліміти є в [підготовці](00-start.md).
 
 ## Чого бракує зараз і що зміниться
 
@@ -34,7 +34,7 @@
 import { generateText } from 'ai';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 
-const model = openrouter('openai/gpt-oss-20b');
+const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free');
 ```
 
 Нижче зроби один запит:
@@ -64,11 +64,11 @@ npm test -- --test-name-pattern "^0[0-1] "
 npm start
 ```
 
-**Автоматична перевірка:** 3 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 5 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Причина завершення й текст привітання. Це перший запит до OpenRouter.
 
-**Якщо не так:** 401 — перевір ключ у підготовленому .env. 402 — баланс ключа. 429 — прочитай відповідь сервера й зачекай. length — збільш maxOutputTokens до 2400 у src/main.ts та повтори; обрізану відповідь не вважай успіхом.
+**Якщо не так:** 401 — перевір ключ у підготовленому .env. 402 — звір безкоштовний ID :free та текст помилки; поповнення не потрібне. 429 — прочитай відповідь сервера й зачекай. length — збільш maxOutputTokens до 2400 у src/main.ts та повтори; обрізану відповідь не вважай успіхом.
 
 **Збережи свою зміну:**
 
@@ -107,7 +107,7 @@ npm test -- --test-name-pattern "^0[0-1] "
 import { generateText } from 'ai';
 import { openrouter } from '@openrouter/ai-sdk-provider';
 
-const model = openrouter('openai/gpt-oss-20b');
+const model = openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free');
 
 const reply = await generateText({
   model,
