@@ -55,7 +55,7 @@ npm test -- --test-name-pattern "^0[0-7] "
 npm start -- "Перевір списання клієнта 42."
 ```
 
-**Автоматична перевірка:** 11 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 13 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Після одного getCharges у messages три записи: user, assistant, tool. Повторного запиту ще немає.
 
