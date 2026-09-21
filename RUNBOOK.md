@@ -203,4 +203,4 @@ git switch step-1-loop
 | `day2-flue-solution` | Готові шість кроків другого дня |
 | `main` | Усі готові рішення та документація |
 
-Після перемикання гілки виконай `npm ci`. Для другого дня переходь до [day2/RUNBOOK.md](day2/RUNBOOK.md).
+Після перемикання гілки виконай `npm ci`. Для другого дня переходь до [day2/RUNBOOK.md](https://github.com/genkovich/harness-workshop/blob/day2-flue/day2/RUNBOOK.md).
