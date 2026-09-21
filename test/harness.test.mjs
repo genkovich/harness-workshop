@@ -67,9 +67,17 @@ test("06 Виконання: searchStories повертає теми, аргум
 });
 test("07 Історія: результат повертається з id виклику", async () => {
   const model = new MockLanguageModelV3({
-    doGenerate: [reply([call("searchStories", { query: "harness" }, "id-42")]), final]
+    doGenerate: [reply([
+      { type: "text", text: "Спершу перевірю обговорення." },
+      call("searchStories", { query: "harness" }, "id-42")
+    ]), final]
   });
   const result = await runAgent(await agent({ model }), "Перевір");
+  const assistant = result.messages.find(message => message.role === "assistant");
+  assert.ok(assistant);
+  assert.ok(assistant.content.some(part => part.type === "text" && part.text === "Спершу перевірю обговорення."));
+  assert.ok(assistant.content.some(part => part.type === "tool-call" && part.toolCallId === "id-42"));
+  assert.equal(result.messages.filter(message => message.role === "tool").length, 1);
   const message = result.messages.find((message2) => message2.role === "tool");
   assert.ok(message);
   assert.equal(message.content[0].toolCallId, "id-42");
@@ -136,6 +144,25 @@ test("08 Помилка: Некоректні аргументи й невідо
     assert.equal(next.filter((message) => message.role === "tool").length, 1);
     const nextRequest = JSON.stringify(next);
     assert.match(nextRequest, /error/);
+  }
+
+  // Помилка асинхронної функції теж має повернутися до моделі як один результат.
+  for (const failure of [new Error('HN недоступний'), 'мережу втрачено']) {
+    const model = new MockLanguageModelV3({
+      doGenerate: [reply([call('searchStories', { query: 'harness' })]), final],
+    });
+    const options = await agent({
+      model,
+      runTool: async () => {
+        await Promise.resolve();
+        throw failure;
+      },
+    });
+    await runAgent(options, 'Перевір помилку виконання');
+    const results = model.doGenerateCalls[1].prompt.filter(message => message.role === 'tool');
+    assert.equal(results.length, 1);
+    assert.equal(results[0].content[0].output.value.error,
+      failure instanceof Error ? failure.message : failure);
   }
 });
 test("08 Обрізання: Обрізані аргументи не доходять до виконання", async () => {
