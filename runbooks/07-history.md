@@ -52,12 +52,12 @@ console.log('Повідомлень в історії:', messages.length);
 ```bash
 npm run check
 npm test -- --test-name-pattern "^0[0-7] "
-npm start -- "Перевір списання клієнта 42."
+npm start -- "Знайди до трьох обговорень про harness engineering і coding agents за останні 7 днів. Прочитай коментарі та збережи український дайджест із посиланнями."
 ```
 
-**Автоматична перевірка:** 13 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 18 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Після одного getCharges у messages три записи: user, assistant, tool. Повторного запиту ще немає.
+**Очікуємо:** Після одного searchStories у messages три записи: user, assistant, tool. Повторного запиту ще немає.
 
 **Якщо не так:** Звір toolCallId. Повідомлення assistant має стояти перед його tool result; одного console.log для передачі моделі недостатньо.
 
@@ -89,7 +89,7 @@ npm test -- --test-name-pattern "^0[0-7] "
 
 ## Готовий код
 
-Очікуваний вміст змінених файлів після цього етапу. Інші файли залишаються як були. Маленькі кроки наведено вище.
+Очікуваний вміст змінених файлів після теми. Інші файли залишаються без змін.
 
 <details>
 <summary>src/harness.ts</summary>
