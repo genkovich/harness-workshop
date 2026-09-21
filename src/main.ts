@@ -1,4 +1,3 @@
-import { openrouter } from '@openrouter/ai-sdk-provider';
 import { runAgent } from './harness.ts';
 import { billing } from './billing/agent.ts';
 
@@ -9,13 +8,7 @@ if (!task) {
 }
 
 try {
-  const result = await runAgent(
-    {
-      ...billing,
-      model: openrouter('openai/gpt-oss-20b'),
-    },
-    task,
-  );
+  const result = await runAgent(billing, task);
 
   if (result.text) console.log(`\nВідповідь: ${result.text}`);
   if (result.reason === 'limit') process.exitCode = 2;
