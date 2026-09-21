@@ -68,7 +68,7 @@ npm test -- --test-name-pattern "^(0[0-9]|10) "
 npm start -- "Перевір списання клієнта 42."
 ```
 
-**Автоматична перевірка:** 19 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 21 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді живої моделі.
 
@@ -132,7 +132,7 @@ const system = [
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  model: openrouter('openai/gpt-oss-20b'),
+  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
   system,
   context: rules,
 
