@@ -22,7 +22,7 @@ const system = [
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  model: openrouter('openai/gpt-oss-20b'),
+  model: openrouter(process.env.OPENROUTER_MODEL || 'qwen/qwen3.8-27b:free'),
   system,
   context: rules,
 

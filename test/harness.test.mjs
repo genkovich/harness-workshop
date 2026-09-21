@@ -204,7 +204,7 @@ async function runEntry(t, task) {
   ], {
     cwd: root, encoding: 'utf8', timeout: 15_000,
     env: { ...process.env, OPENROUTER_API_KEY: 'offline-test-key',
-      HARNESS_REQUESTS_PATH: capture, TRACE: '0', APPROVED: '0' },
+      OPENROUTER_MODEL: 'qwen/qwen3.8-27b:free', HARNESS_REQUESTS_PATH: capture, TRACE: '0', APPROVED: '0' },
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Тестова відповідь без мережі/);
@@ -215,7 +215,7 @@ async function runEntry(t, task) {
 
 test('01 Модель: main.ts робить один справжній запит SDK із підміненим HTTP', async (t) => {
   const request = await runEntry(t, 'Привіт');
-  assert.equal(request.model, 'openai/gpt-oss-20b');
+  assert.equal(request.model, 'qwen/qwen3.8-27b:free');
   assert.ok(request.messages.some(message => message.role === 'user'));
 });
 
@@ -267,7 +267,7 @@ test('08 OpenRouter: HTTP tool call повертається наступним 
     requests.push(JSON.parse(options.body));
     const first = requests.length === 1;
     return new Response(JSON.stringify({
-      id: 'offline', object: 'chat.completion', created: 1, model: 'openai/gpt-oss-20b',
+      id: 'offline', object: 'chat.completion', created: 1, model: 'qwen/qwen3.8-27b:free',
       choices: [{ index: 0, finish_reason: first ? 'tool_calls' : 'stop', message: first ? {
         role: 'assistant', content: null, tool_calls: [{ id: 'router_1', type: 'function',
           function: { name: 'getCharges', arguments: '{"customerId":42}' } }],
@@ -275,7 +275,7 @@ test('08 OpenRouter: HTTP tool call повертається наступним 
       usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
     }), { headers: { 'content-type': 'application/json' } });
   } });
-  const result = await runAgent(await agent({ model: router('openai/gpt-oss-20b') }), 'Перевір 42');
+  const result = await runAgent(await agent({ model: router('qwen/qwen3.8-27b:free') }), 'Перевір 42');
   assert.equal(result.reason, 'final');
   assert.equal(result.text, 'Два списання.');
   assert.equal(requests.length, 2);
