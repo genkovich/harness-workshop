@@ -1,0 +1,112 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { APICallError, tool } from 'ai';
+import { MockLanguageModelV3 } from 'ai/test';
+import { z } from 'zod';
+
+const response = content => ({
+  content,
+  finishReason: {
+    unified: content.some(part => part.type === 'tool-call') ? 'tool-calls' : 'stop',
+    raw: '',
+  },
+  usage: {
+    inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 },
+    outputTokens: { total: 0, text: 0, reasoning: 0 },
+  },
+});
+const final = response([{ type: 'text', text: 'Готово.' }]);
+const limited = (message, responseHeaders, statusCode = 429) => new APICallError({
+  message, responseHeaders, statusCode,
+  url: 'https://api.groq.com/openai/v1/chat/completions',
+  requestBodyValues: {},
+});
+
+test('08b Groq 429: пауза зберігає історію, не повторює дію й має межу', async t => {
+  const { runAgent } = await import('../src/harness.ts');
+  const waits = [];
+  t.mock.method(globalThis, 'setTimeout', (callback, milliseconds) => {
+    waits.push(milliseconds);
+    queueMicrotask(callback);
+    return {};
+  });
+  const agent = model => ({
+    model, system: 'Виконай дію.', maxSteps: 2,
+    tools: { save: tool({ description: 'Запис', inputSchema: z.object({}) }) },
+    runTool: async () => ({ saved: true }),
+  });
+
+  for (const headers of [undefined, { 'retry-after': '21' }]) {
+    waits.length = 0;
+    const requests = [];
+    let executions = 0;
+    const model = new MockLanguageModelV3({ doGenerate: async options => {
+      requests.push(structuredClone(options.prompt));
+      if (requests.length === 1) {
+        return response([{ type: 'tool-call', toolCallId: 'save-1', toolName: 'save', input: '{}' }]);
+      }
+      if (requests.length === 2) {
+        throw limited('Rate limit reached on ITPM: Limit 7000, Used 3537, Requested 5834. Please try again in 20.322857142s.', headers);
+      }
+      return final;
+    } });
+    const options = agent(model);
+    options.runTool = async () => { executions += 1; return { saved: true }; };
+    const result = await runAgent(options, 'Збережи');
+    assert.equal(result.reason, 'final');
+    assert.equal(requests.length, 3);
+    assert.equal(executions, 1);
+    assert.deepEqual(requests[1], requests[2]);
+    assert.deepEqual(waits, [headers ? 22000 : 21323]);
+  }
+
+  for (const error of [
+    limited('Request too large: expected output tokens exceed limit.', { 'retry-after': '1' }),
+    limited('Rate limit reached. Please try again in 3600s.'),
+    limited('Rate limit reached.', { 'retry-after': 'invalid' }),
+    limited('Invalid key', { 'retry-after': '1' }, 401),
+  ]) {
+    waits.length = 0;
+    const model = new MockLanguageModelV3({ doGenerate: async () => { throw error; } });
+    await assert.rejects(() => runAgent(agent(model), 'Перевір'), e => e === error);
+    assert.equal(model.doGenerateCalls.length, 1);
+    assert.deepEqual(waits, []);
+  }
+
+  waits.length = 0;
+  const error = limited('Rate limit reached', { 'retry-after': '1' });
+  const model = new MockLanguageModelV3({ doGenerate: async () => { throw error; } });
+  await assert.rejects(() => runAgent(agent(model), 'Перевір'), e => e === error);
+  assert.equal(model.doGenerateCalls.length, 3);
+  assert.deepEqual(waits, [2000, 2000]);
+});
+
+
+test('08b Дані: пʼять тем, три короткі коментарі й наступна порція', async t => {
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
+  const { news } = await import('../src/news/agent.ts');
+  const hits = Array.from({ length: 9 }, (_, i) => ({
+    objectID: String(i + 1), title: 'Тема', url: null,
+    points: 1, num_comments: 10, created_at: '2026-09-22',
+  }));
+  const children = Array.from({ length: 4 }, (_, i) => ({
+    id: i + 20, author: 'Автор', text: 'x'.repeat(900), children: [],
+  }));
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (String(url).includes('search_by_date')) {
+      assert.equal(new URL(url).searchParams.get('hitsPerPage'), '5');
+      return Response.json({ hits });
+    }
+    return Response.json({ id: 1, type: 'story', title: 'Тема', children });
+  });
+  assert.equal((await searchStories('agents')).length, 5);
+  const first = await readDiscussion(1);
+  assert.equal(first.comments.length, 3);
+  assert.ok(first.comments.every(comment => comment.text.length === 400 && comment.truncated));
+  assert.equal(first.nextOffset, 3);
+  const last = await readDiscussion(1, first.nextOffset);
+  assert.equal(last.comments.length, 1);
+  assert.equal(last.nextOffset, null);
+  assert.match(news.tools.searchStories.description, /5 дискусій/);
+  assert.match(news.tools.readDiscussion.description, /3 коментарі/);
+});
