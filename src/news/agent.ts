@@ -5,15 +5,23 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
 import { readFileSync } from 'node:fs';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 
 const system = [

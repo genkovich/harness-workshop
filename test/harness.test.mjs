@@ -60,6 +60,10 @@ test("06 Виконання: searchStories повертає теми, аргум
   const stories = await news.runTool("searchStories", { query: "harness" });
   assert.deepEqual(stories.map(story => story.id), [101, 102]);
   await assert.rejects(() => news.runTool("searchStories", { query: 42 }));
+  for (const input of [{query: ' '}, {query:'agents',days:0}, {query:'agents',days:31}]) {
+    await assert.rejects(() => news.runTool('searchStories', input));
+  }
+  await assert.rejects(() => news.runTool('readDiscussion', {id:101,offset:-1}));
 });
 test("07 Історія: результат повертається з id виклику", async () => {
   const model = new MockLanguageModelV3({
@@ -228,6 +232,7 @@ async function runEntry(t, task) {
 test('01 Модель: main.ts робить один справжній запит SDK із підміненим HTTP', async (t) => {
   const request = await runEntry(t, 'Привіт');
   assert.equal(request.model, 'qwen/qwen3.8-27b');
+  assert.ok(request.max_tokens > 0 && request.max_tokens < 1000);
   assert.ok(request.messages.some(message => message.role === 'user'));
 });
 
@@ -349,16 +354,13 @@ test('02 Ввід: порожній рядок і пробіли відхиля�
 test('06 HN: пошук передає запит, період і обмеження, повертає посилання', async (t) => {
   let address;
   t.mock.method(globalThis, 'fetch', async url => { address = new URL(url); return Response.json(fixture); });
-  const { news } = await import('../src/news/agent.ts');
-  const result = await news.runTool('searchStories', { query: 'tool calling', days: 3 });
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
+  const result = await searchStories('tool calling', 3);
   assert.equal(address.searchParams.get('query'), 'tool calling');
   assert.equal(address.searchParams.get('hitsPerPage'), '10');
   const since = Number(/created_at_i>(\d+)/.exec(address.searchParams.get('numericFilters'))[1]);
   assert.ok(Math.abs(since - (Math.floor(Date.now() / 1000) - 3 * 86400)) < 2);
   assert.equal(result[0].url, 'https://news.ycombinator.com/item?id=101');
-  for (const input of [{query: ' '}, {query:'agents',days:0}, {query:'agents',days:31}]) {
-    await assert.rejects(() => news.runTool('searchStories', input));
-  }
 });
 
 test('06 HN: порції коментарів, батьківські id й ознака обрізання', async (t) => {
@@ -366,9 +368,9 @@ test('06 HN: порції коментарів, батьківські id й о�
   tree.children = Array.from({length: 11}, (_, i) => ({ id: 200+i, text: 'x'.repeat(1200), children: [] }));
   tree.children.push({id:999,text:null,children:[]});
   t.mock.method(globalThis, 'fetch', async () => Response.json(tree));
-  const { news } = await import('../src/news/agent.ts');
-  const first = await news.runTool('readDiscussion', { id: 101 });
-  const second = await news.runTool('readDiscussion', { id: 101, offset: first.nextOffset });
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
+  const first = await readDiscussion(101);
+  const second = await readDiscussion(101, first.nextOffset);
   assert.equal(first.comments.length, 10);
   assert.equal(first.comments[0].parentId, 101);
   assert.equal(first.comments[0].text.length, 1000);
@@ -377,27 +379,26 @@ test('06 HN: порції коментарів, батьківські id й о�
   assert.equal(second.comments.length, 1);
   assert.equal(second.nextOffset, null);
   assert.equal(first.totalComments, 11);
-  assert.equal((await news.runTool('readDiscussion', {id:101,offset:100})).nextOffset, null);
-  await assert.rejects(() => news.runTool('readDiscussion', {id:101,offset:-1}));
+  assert.equal((await readDiscussion(101, 100)).nextOffset, null);
 });
 
 test('06 HN: вкладені відповіді зберігають parentId і порядок', async () => {
-  const { news } = await import('../src/news/agent.ts');
-  const result = await news.runTool('readDiscussion', {id:101});
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
+  const result = await readDiscussion(101);
   assert.deepEqual(result.comments.map(c => [c.id,c.parentId]), [[201,101],[202,201]]);
 });
 
 test('06 HN: порожній пошук та дискусія без коментарів — коректні результати', async (t) => {
   t.mock.method(globalThis, 'fetch', async url => Response.json(String(url).includes('search_by_date') ? {hits:[]} : {id:101,type:'story',children:[]}));
-  const { news } = await import('../src/news/agent.ts');
-  assert.deepEqual(await news.runTool('searchStories', {query:'unknown'}), []);
-  const result = await news.runTool('readDiscussion', {id:101});
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
+  assert.deepEqual(await searchStories('unknown'), []);
+  const result = await readDiscussion(101);
   assert.deepEqual(result.comments, []);
   assert.equal(result.nextOffset, null);
 });
 
 test('06 HN: HTTP, timeout, null і невірний тип повертають зрозумілу помилку', async (t) => {
-  const { news } = await import('../src/news/agent.ts');
+  const { searchStories, readDiscussion } = await import('../src/news/api.ts');
   for (const [fetch, pattern] of [
     [async () => new Response('',{status:429}), /HTTP 429/],
     [async () => {throw new Error('timeout');}, /timeout/],
@@ -405,7 +406,7 @@ test('06 HN: HTTP, timeout, null і невірний тип повертають
     [async () => Response.json({type:'comment'}), /id обговорення/],
   ]) {
     t.mock.method(globalThis, 'fetch', fetch);
-    await assert.rejects(() => news.runTool('readDiscussion', {id:101}), pattern);
+    await assert.rejects(() => readDiscussion(101), pattern);
   }
 });
 
