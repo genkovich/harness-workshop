@@ -93,15 +93,20 @@ git switch step-1-request
 tools: agent.tools,
 ```
 
-Перед `console.log('Модель відповіла. Це один запит без тулів.')` встав:
+Замінюй останні два рядки функції (повідомлення про відповідь і `return`) цим блоком:
 
 ```ts
-if (reply.toolCalls.length > 0) {
-  for (const call of reply.toolCalls) {
-    console.log(`Модель просить ${call.toolName}:`, call.input);
-  }
-  return { reason: 'tool-call', text: reply.text, messages };
+// Немає запитів на тули: модель уже дала фінальну відповідь.
+if (reply.toolCalls.length === 0) {
+  console.log('Зупинка: модель відповіла без виклику тула.');
+  return { reason: 'final', text: reply.text, messages };
 }
+
+for (const call of reply.toolCalls) {
+  console.log(`Модель просить ${call.toolName}:`, call.input);
+}
+
+return { reason: 'tool-call', text: reply.text, messages };
 ```
 
-`npm start`: бачиш getCharges та customerId. Читання даних ще не відбулося.
+`npm start`: модель може попросити getCharges та передати customerId. Читання даних ще не відбулося.
