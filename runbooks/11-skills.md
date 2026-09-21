@@ -27,7 +27,11 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 const directory = new URL('../skills/', import.meta.url);
 ```
 
-Нижче склади список skills. Повний текст поки залишається в нашій програмі:
+`readdirSync` читає назви в папці, `existsSync` перевіряє наявність `SKILL.md`. `.filter(...)` залишає лише записи з таким файлом, `.map(...)` створює обʼєкти `{ name, description, text }`.
+
+Вираз `/^description: (.+)$/m` шукає рядок `description:` у Markdown. `m` дозволяє шукати початок і кінець кожного рядка; `.exec(text)?.[1]` дістає текст після двокрапки або `undefined`, якщо збігу немає. Це просте читання одного рядка, не повний YAML-парсер.
+
+Нижче склади список skills. Повний текст читаємо з диска вже зараз, але **моделі його ще не передаємо**:
 
 ```ts
 export const skills = readdirSync(directory)
@@ -39,6 +43,8 @@ export const skills = readdirSync(directory)
     return { name, description, text };
   });
 ```
+
+`.find(...)` шукає точний збіг імені в уже зібраному каталозі. Для нашого файла імʼя — `digest`. Невідоме імʼя викликає помилку; шлях на кшталт `../../.env` не використовується для читання диска.
 
 Додай функцію читання за іменем:
 
@@ -58,6 +64,8 @@ import { skills, readSkill } from '../skills.ts';
 const skillInput = z.object({ name: z.string() });
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 ```
+
+`descriptions` склеює лише імена та короткі описи через перенос рядка. Це підказка моделі, яку інструкцію можна попросити через `readSkill`. Повний `text` повертається в tool result тільки після вибору skill — так працює поступове додавання контексту в цій практиці.
 
 Заміни context: rules на:
 
@@ -95,7 +103,7 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Очікуємо:** Спочатку модель бачить опис; після readSkill — повний текст у tool result.
 
-**Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя news, не шлях. Для живої перевірки попроси явно прочитати skill digest.
+**Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя digest, не шлях. Для живої перевірки попроси явно прочитати skill digest.
 
 **Збережи свою зміну:**
 
