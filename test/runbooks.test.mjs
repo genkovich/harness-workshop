@@ -31,10 +31,11 @@ test('00 Підготовка: команда prepare створює .env і з�
 
 test('00 Ранбуки: усі теми, локальні посилання, пояснення, перевірки та готовий код доступні', async () => {
   const folder = join(root, 'runbooks');
-  const files = (await readdir(folder)).filter(file => /^\d\d-.*\.md$/.test(file)).sort();
-  assert.equal(files.length, 13);
+  const files = (await readdir(folder)).filter(file => /^\d\d(?:b)?-.*\.md$/.test(file)).sort();
+  const stages = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '08b', '09', '10', '11', '12'];
+  assert.equal(files.length, stages.length);
   for (const [index, file] of files.entries()) {
-    assert.equal(Number(file.slice(0, 2)), index);
+    assert.equal(file.split('-')[0], stages[index]);
     const content = await readFile(join(folder, file), 'utf8');
     for (const section of ['Що робимо й навіщо', 'Перевірка', 'Готовий код']) {
       assert.ok(content.includes(section), `${file}: немає ${section}`);
