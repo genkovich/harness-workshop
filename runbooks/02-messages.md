@@ -23,7 +23,16 @@ import { generateText, type ModelMessage } from 'ai';
 Після const model додай задачу та початкове повідомлення:
 
 ```ts
-const task = process.argv[2] || 'Перевір списання клієнта 42.';
+const task = process.argv[2]?.trim();
+if (!task) {
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  process.exit(1);
+}
+```
+
+Порожній ввід має завершити програму до HTTP-запиту. Після перевірки створюємо повідомлення:
+
+```ts
 const messages: ModelMessage[] = [{ role: 'user', content: task }];
 ```
 
@@ -40,15 +49,24 @@ messages,
 console.log('Повідомлення:', messages);
 ```
 
+Окремо перевір відсутню задачу та пробіли:
+
+```bash
+npm start
+npm start -- "   "
+```
+
+В обох випадках очікуємо «Помилка: передай задачу» й код завершення 1. Клієнт 42 не підставляється: його треба явно назвати у задачі.
+
 ## Перевірка
 
 ```bash
 npm run check
 npm test -- --test-name-pattern "^0[0-2] "
-npm start
+npm start -- "Перевір списання клієнта 42."
 ```
 
-**Автоматична перевірка:** 4 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 6 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** Одна задача user і відповідь моделі. Тулів ще немає; текст про списання не означає, що дані перевірені.
 
@@ -82,7 +100,7 @@ npm test -- --test-name-pattern "^0[0-2] "
 
 ## Готовий код
 
-Очікуваний вміст змінених файлів після цього етапу. Інші файли залишаються як були. Це код для звірки; маленькі кроки наведено вище.
+Очікуваний вміст змінених файлів після цього етапу. Інші файли залишаються як були. Маленькі кроки наведено вище.
 
 <details>
 <summary>src/main.ts</summary>
@@ -93,7 +111,11 @@ import { openrouter } from '@openrouter/ai-sdk-provider';
 
 const model = openrouter('openai/gpt-oss-20b');
 
-const task = process.argv[2] || 'Перевір списання клієнта 42.';
+const task = process.argv[2]?.trim();
+if (!task) {
+  console.error('Помилка: передай задачу. Наприклад: npm start -- "Перевір списання клієнта 42."');
+  process.exit(1);
+}
 const messages: ModelMessage[] = [{ role: 'user', content: task }];
 
 const reply = await generateText({
