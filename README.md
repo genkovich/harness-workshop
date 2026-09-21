@@ -1,6 +1,6 @@
 # Harness Workshop · день 1
 
-**Ця гілка:** `step-08b-limits` — результат етапу 08.
+**Ця гілка:** `step-08b-limits` — результат етапу 08б: менші дані та пауза при 429.
 
 [Усі ранбуки](runbooks/README.md) · [Підготовка](runbooks/00-start.md) · [Тести](test/harness.test.mjs).
 
