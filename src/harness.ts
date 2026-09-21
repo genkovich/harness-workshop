@@ -2,11 +2,13 @@ import {
   generateText,
   type LanguageModel,
   type ModelMessage,
+  type ToolSet,
 } from 'ai';
 
 export type Agent = {
   model: LanguageModel;
   system: string;
+  tools: ToolSet;
 };
 
 export async function runAgent(agent: Agent, task: string) {
@@ -18,6 +20,7 @@ export async function runAgent(agent: Agent, task: string) {
     model: agent.model,
     system: agent.system,
     messages,
+    tools: agent.tools,
     maxRetries: 0,
     maxOutputTokens: 1200,
     abortSignal: AbortSignal.timeout(60_000),
@@ -31,6 +34,15 @@ export async function runAgent(agent: Agent, task: string) {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
   }
 
-  console.log('Модель відповіла. Це один запит без тулів.');
-  return { reason: 'final', text: reply.text, messages };
+  // Немає запитів на тули: модель уже дала фінальну відповідь.
+  if (reply.toolCalls.length === 0) {
+    console.log('Зупинка: модель відповіла без виклику тула.');
+    return { reason: 'final', text: reply.text, messages };
+  }
+
+  for (const call of reply.toolCalls) {
+    console.log(`Модель просить ${call.toolName}:`, call.input);
+  }
+
+  return { reason: 'tool-call', text: reply.text, messages };
 }

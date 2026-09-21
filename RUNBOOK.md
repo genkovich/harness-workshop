@@ -1,88 +1,54 @@
-# 04. Описи тулів
+# 05. Tool call
 
-Почни з власного коду після етапу 03. Змінюй лише `src/`. Контрольна точка після виконання: `step-04-tools`. Тести й конфігурація вже готові.
+Почни з власного коду після етапу 04. Змінюй лише `src/`. Контрольна точка після виконання: `step-05-call`. Тести й конфігурація вже готові.
 
-Дані вже лежать у src/billing/charges.json. Створи поряд `src/billing/agent.ts`:
+У src/harness.ts додай type ToolSet до імпорту з ai. До типу Agent додай:
 
 ```ts
-import { tool } from 'ai';
-import { z } from 'zod';
-
-const customerId = z.number().int().positive();
-const chargesInput = z.object({ customerId });
-const replyInput = z.object({
-  customerId,
-  text: z.string().min(1).max(4000),
-});
+tools: ToolSet;
 ```
 
-Нижче створи обʼєкт billing:
+У generateText додай параметр:
 
 ```ts
-export const billing = {
-  system: 'Ти агент підтримки. Перевір списання через getCharges, ' +
-    'потім відповідай через sendReply. ' +
-    'Якщо дію заблоковано, попроси дозвіл.',
-  tools: {
-    // Тут будуть два описи нижче.
-  },
-};
+tools: agent.tools,
 ```
 
-У tools додай перший опис:
+Заміни останній return функції runAgent перевіркою:
 
 ```ts
-getCharges: tool({
-  description: 'Знайди списання клієнта.',
-  inputSchema: chargesInput,
-}),
-```
-
-Поряд додай другий:
-
-```ts
-sendReply: tool({
-  description: 'Надішли відповідь після перевірки списань.',
-  inputSchema: replyInput,
-}),
-```
-
-У src/main.ts додай імпорт:
-
-```ts
-import { billing } from './billing/agent.ts';
-```
-
-У параметрі runAgent заміни system на розгортання billing:
-
-```ts
-{
-  ...billing,
-  model: openrouter('openai/gpt-oss-20b'),
+if (reply.toolCalls.length === 0) {
+  return { reason: 'final', text: reply.text, messages };
 }
+
+for (const call of reply.toolCalls) {
+  console.log(`Модель просить ${call.toolName}:`, call.input);
+}
+
+return { reason: 'tool-call', text: reply.text, messages };
 ```
 
 ## Запусти й перевір
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^01 "
+npm test -- --test-name-pattern "^0[12] "
 npm start
 ```
 
-**Тести:** 1 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
+**Тести:** 2 перевірок мають пройти. Команда запускає лише вже реалізовану поведінку.
 
-**Очікуємо:** Один тест проходить. Описи існують у нашому обʼєкті; у TRACE tools ще немає. Наступним кроком передамо їх моделі.
+**Очікуємо:** Два тести проходять. Якщо модель обрала getCharges, видно імʼя й customerId. Виконання ще немає.
 
-**Якщо не так:** Не додавай execute до tool(): виконання підключимо власним кодом. Перевір, що обидва описи лежать усередині billing.tools.
+**Якщо не так:** Немає tools у TRACE — перевір generateText. Звичайний текст із JSON не є tool call і не виконується.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 04: Описи тулів"
+git commit -m "Етап 05: Tool call"
 ```
 
-Далі відкрий [етап 05 у браузері](https://github.com/genkovich/harness-workshop/blob/step-05-call/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
+Далі відкрий [етап 06 у браузері](https://github.com/genkovich/harness-workshop/blob/step-06-execute/RUNBOOK.md). Продовжуй у своїй гілці: перемикання потрібне лише щоб наздогнати групу.
 
