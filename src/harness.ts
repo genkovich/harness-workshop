@@ -5,6 +5,9 @@ import {
   type ToolSet,
 } from 'ai';
 
+const maxOutputTokens = 512;
+const modelTimeoutMs = 60_000;
+
 export type Agent = {
   model: LanguageModel;
   system: string;
@@ -22,8 +25,8 @@ export async function runAgent(agent: Agent, task: string) {
     messages,
     tools: agent.tools,
     maxRetries: 0,
-    maxOutputTokens: 1200,
-    abortSignal: AbortSignal.timeout(60_000),
+    maxOutputTokens,
+    abortSignal: AbortSignal.timeout(modelTimeoutMs),
     include: { requestBody: true },
   });
 

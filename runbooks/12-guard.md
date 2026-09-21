@@ -2,7 +2,7 @@
 
 [Усі теми](README.md) · [Попередня](11-skills.md)
 
-**Перед початком:** код після `step-11-skills`. **Результат теми:** `step-12-guard`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-11-skills`. **Результат теми:** `step-12-guard`. Змінюємо лише `src/`.
 
 ## Що робимо й навіщо
 
@@ -13,13 +13,13 @@
 Опис і промпт можуть попросити не робити дію, але вибір моделі не є перевіркою дозволу. Ставимо код перед runTool, щоб заборонений запис не відбувся.
 
 - beforeTool перевіряє виклик до дії; APPROVED передаємо через середовище запуску.
-- Якщо повернувся текст блокування, виконавець не запускається, а модель отримує помилку як tool result.
+- Якщо повернувся текст блокування, виконавець не запускається, а модель отримує помилку як результат інструмента.
 - Правило в system просить пояснити блокування й запитати дозвіл. Воно не замінює перевірку коду.
-- Перевіряємо стан файла: без дозволу запису немає, з дозволом файл містить новий дайджест. Самої фрази моделі «готово» недостатньо.
+- Перевіряємо стан файла: без дозволу файл не змінюється, з дозволом файл містить новий дайджест. Самої фрази моделі «готово» недостатньо.
 
 ## Маленькі зміни
 
-Спочатку в масив system у src/news/agent.ts перед закриттям масиву system додай правило реакції на блокування:
+У `src/news/agent.ts` додай до масиву `system` правило, яке пояснює моделі, що робити в разі блокування:
 
 ```ts
 'Дозвіл: якщо запис заблоковано, попроси підтвердження та заверши відповідь.',
@@ -46,7 +46,7 @@ beforeTool(name: string) {
 beforeTool?: (name: string) => string | null;
 ```
 
-`beforeTool?` робить перевірку необовʼязковою для інших агентів. `agent.beforeTool?.(...)` викликає її, лише якщо метод є. Непорожній текст у `blocked` перетворюємо на помилку; наявний `catch` запише її в tool result. Перевірка стоїть **перед** `runTool`, тому файл ще не відкривався для запису.
+`beforeTool?` робить перевірку необовʼязковою для інших агентів. `agent.beforeTool?.(...)` викликає її, лише якщо метод є. Непорожній текст у `blocked` перетворюємо на помилку; наявний `catch` запише її в результаті інструмента. Перевірка стоїть **перед** `runTool`, тому файл ще не відкривався для запису.
 
 У try перед agent.runTool встав:
 
@@ -76,9 +76,9 @@ npm start -- "Знайди до трьох обговорень про harness e
 
 **Автоматична перевірка:** 30 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** Без дозволу saveDigest повертає blocked і не змінює digest.md. Дозволений виклик створює файл або замінює попередній дайджест. Якщо файл існував до забороненого запуску, він має лишитися незмінним.
+**Очікуємо:** без дозволу saveDigest повертає blocked і не змінює digest.md. Дозволений виклик створює файл або замінює попередній дайджест. Якщо файл існував до забороненого запуску, він має лишитися незмінним.
 
-**Якщо не так:** Файл змінився без дозволу — перевір місце beforeTool. Повторний запит моделі на заборонений тул ще не означає виконання дії.
+**Якщо не так:** Файл змінився без дозволу — перевір місце beforeTool. Повторний запит моделі на заборонений інструмент ще не означає виконання дії.
 
 **Збережи свою зміну:**
 
@@ -88,7 +88,7 @@ git diff --cached
 git commit -m "Етап 12: Дозвіл"
 ```
 
-## Якщо не встиг: готова точка й наступна тема
+## Якщо не встиг: готове рішення
 
 Ця гілка містить **результат теми 12**. Збережи свою спробу й створи робочу гілку від готового коду:
 
@@ -104,7 +104,7 @@ npm test -- --test-name-pattern "^(0[0-9]|1[0-2]) "
 
 Власний коміт залишився у попередній гілці. Якщо work-finished вже існує, обери нове імʼя, наприклад work-finished-retry. .env і node_modules залишаються на місці. Відкрий [завершений маршрут](README.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
 
-Якщо завершив самостійно, продовжуй у своїй гілці за наступним ранбуком; брати готовий код необовʼязково.
+Якщо завершив самостійно, залишайся у своїй гілці: у тебе вже є готове рішення.
 
 ## Готовий код
 
@@ -122,6 +122,11 @@ import {
   type JSONValue,
 } from 'ai';
 
+const maxOutputTokens = 512;
+const modelTimeoutMs = 60_000;
+
+const defaultMaxSteps = 10;
+
 export type Agent = {
   model: LanguageModel;
   system: string;
@@ -137,7 +142,7 @@ export async function runAgent(agent: Agent, task: string) {
     { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
   ];
 
-  for (let step = 1; step <= (agent.maxSteps ?? 10); step++) {
+  for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
 
     const reply = await generateText({
@@ -146,8 +151,8 @@ export async function runAgent(agent: Agent, task: string) {
       messages,
       tools: agent.tools,
       maxRetries: 0,
-      maxOutputTokens: 1200,
-      abortSignal: AbortSignal.timeout(60_000),
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(modelTimeoutMs),
       include: { requestBody: true },
     });
 
@@ -227,16 +232,26 @@ import { searchStories, readDiscussion } from './api.ts';
 import { readFileSync } from 'node:fs';
 import { skills, readSkill } from '../skills.ts';
 
+const maxQueryCharacters = 120;
+const maxSearchDays = 30;
+const defaultSearchDays = 7;
+const maxCommentOffset = 10_000;
+const maxDigestCharacters = 12_000;
+
 const searchInput = z.object({
-  query: z.string().trim().min(1).max(120),
-  days: z.number().int().min(1).max(30).default(7),
+  query: z.string().trim().min(1).max(maxQueryCharacters),
+  days: z.number().int().min(1).max(maxSearchDays).default(defaultSearchDays),
 });
 const discussionInput = z.object({
   id: z.number().int().positive(),
-  offset: z.number().int().min(0).max(10000).default(0),
+  offset: z.number().int().min(0).max(maxCommentOffset).default(0),
 });
-const digestInput = z.object({ text: z.string().trim().min(1).max(12000) });
-const skillInput = z.object({ name: z.string() });
+const digestInput = z.object({
+  text: z.string().trim().min(1).max(maxDigestCharacters),
+});
+const skillInput = z.object({
+  name: z.string(),
+});
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
