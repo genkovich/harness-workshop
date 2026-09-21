@@ -1,4 +1,4 @@
-import { groq } from '@ai-sdk/groq';
+import { openrouter } from '@openrouter/ai-sdk-provider';
 import { runAgent } from './harness.ts';
 import { billing } from './billing/agent.ts';
 
@@ -10,7 +10,7 @@ try {
   const result = await runAgent(
     {
       ...billing,
-      model: groq('openai/gpt-oss-20b'),
+      model: openrouter('openai/gpt-oss-20b'),
     },
     task,
   );
