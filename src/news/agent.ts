@@ -41,11 +41,11 @@ export const news = {
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
     searchStories: tool({
-      description: 'Знайди до 10 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
+      description: 'Знайди до 5 дискусій HN за темою й періодом. Спробуй інший запит, якщо результатів замало.',
       inputSchema: searchInput,
     }),
     readDiscussion: tool({
-      description: 'Прочитай 10 коментарів дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
+      description: 'Прочитай 3 коментарі дискусії. Якщо nextOffset не null, ним можна дочитати наступну порцію.',
       inputSchema: discussionInput,
     }),
     saveDigest: tool({

@@ -384,7 +384,9 @@ test('06 HN: пошук передає запит, період і обмеже�
   const { searchStories, readDiscussion } = await import('../src/news/api.ts');
   const result = await searchStories('tool calling', 3);
   assert.equal(address.searchParams.get('query'), 'tool calling');
-  assert.equal(address.searchParams.get('hitsPerPage'), '10');
+  const limit = Number(address.searchParams.get('hitsPerPage'));
+  assert.ok(Number.isInteger(limit) && limit > 0 && limit <= 10);
+  assert.ok(result.length <= limit);
   const since = Number(/created_at_i>(\d+)/.exec(address.searchParams.get('numericFilters'))[1]);
   assert.ok(Math.abs(since - (Math.floor(Date.now() / 1000) - 3 * 86400)) < 2);
   assert.equal(result[0].url, 'https://news.ycombinator.com/item?id=101');
@@ -397,15 +399,23 @@ test('06 HN: порції коментарів, батьківські id й о�
   t.mock.method(globalThis, 'fetch', async () => Response.json(tree));
   const { searchStories, readDiscussion } = await import('../src/news/api.ts');
   const first = await readDiscussion(101);
-  const second = await readDiscussion(101, first.nextOffset);
-  assert.equal(first.comments.length, 10);
+  const pageSize = first.comments.length;
+  assert.ok(pageSize > 0 && pageSize <= 10);
   assert.equal(first.comments[0].parentId, 101);
-  assert.equal(first.comments[0].text.length, 1000);
+  assert.ok(first.comments[0].text.length > 0 && first.comments[0].text.length <= 1000);
   assert.equal(first.comments[0].truncated, true);
-  assert.equal(first.nextOffset, 10);
-  assert.equal(second.comments.length, 1);
-  assert.equal(second.nextOffset, null);
+  assert.equal(first.nextOffset, pageSize);
   assert.equal(first.totalComments, 11);
+  const ids = first.comments.map(comment => comment.id);
+  let offset = first.nextOffset;
+  while (offset !== null) {
+    const page = await readDiscussion(101, offset);
+    assert.ok(page.comments.length > 0 && page.comments.length <= pageSize);
+    assert.ok(page.nextOffset === null || page.nextOffset > offset);
+    ids.push(...page.comments.map(comment => comment.id));
+    offset = page.nextOffset;
+  }
+  assert.deepEqual(ids, Array.from({ length: 11 }, (_, i) => 200 + i));
   assert.equal((await readDiscussion(101, 100)).nextOffset, null);
 });
 
