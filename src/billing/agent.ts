@@ -10,11 +10,16 @@ const chargesInput = z.object({ customerId });
 const replyInput = z.object({ customerId, text: z.string().min(1).max(4000) });
 const skillInput = z.object({ name: z.string() });
 const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
-const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
+const descriptions = skills
+  .map((skill) => `${skill.name}: ${skill.description}`)
+  .join('\n');
 
 // Один предметний модуль: правила підтримки, описи тулів та їхній код.
 export const billing = {
-  system: 'Ти агент підтримки. Перевір списання через getCharges, потім відповідай через sendReply. Якщо дію заблоковано, попроси дозвіл.',
+  system:
+    'Ти агент підтримки. Перевір списання через getCharges, ' +
+    'потім відповідай через sendReply. ' +
+    'Якщо дію заблоковано, попроси дозвіл.',
   context: `${rules}\nSkills:\n${descriptions}`,
 
   // Модель отримує ці описи. Тут немає execute: тули виконає наш цикл.
@@ -37,7 +42,7 @@ export const billing = {
     switch (name) {
       case 'getCharges': {
         const { customerId } = chargesInput.parse(input);
-        return charges.filter(charge => charge.customerId === customerId);
+        return charges.filter((charge) => charge.customerId === customerId);
       }
       case 'sendReply': {
         const reply = replyInput.parse(input);

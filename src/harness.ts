@@ -1,4 +1,10 @@
-import { generateText, type LanguageModel, type ModelMessage, type ToolSet, type JSONValue } from 'ai';
+import {
+  generateText,
+  type LanguageModel,
+  type ModelMessage,
+  type ToolSet,
+  type JSONValue,
+} from 'ai';
 
 export type Agent = {
   model: LanguageModel;
@@ -29,8 +35,12 @@ export async function runAgent(agent: Agent, task: string) {
       include: { requestBody: true },
     });
 
-    if (process.env.TRACE === '1') console.log('HTTP-запит:', reply.request.body);
-    if (reply.finishReason === 'length') throw new Error('Відповідь обрізано. Тули не виконуємо.');
+    if (process.env.TRACE === '1') {
+      console.log('HTTP-запит:', reply.request.body);
+    }
+    if (reply.finishReason === 'length') {
+      throw new Error('Відповідь обрізано. Тули не виконуємо.');
+    }
 
     // Немає запитів на тули: модель уже дала фінальну відповідь.
     if (reply.toolCalls.length === 0) {
@@ -38,8 +48,11 @@ export async function runAgent(agent: Agent, task: string) {
       return { reason: 'final', text: reply.text, messages };
     }
 
-    // Зберігаємо повідомлення моделі з її tool calls перед результатами.
-    messages.push(...reply.response.messages.filter(message => message.role === 'assistant'));
+    // Спочатку запит моделі на виклик тула, потім наш результат.
+    // Беремо лише assistant: помилки тулів повертаємо нижче самі.
+    messages.push(
+      ...reply.response.messages.filter((message) => message.role === 'assistant'),
+    );
 
     for (const call of reply.toolCalls) {
       console.log(`Модель просить ${call.toolName}:`, call.input);
@@ -47,9 +60,13 @@ export async function runAgent(agent: Agent, task: string) {
 
       try {
         // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-        if (call.invalid) throw call.error;
+        if (call.invalid) {
+          throw call.error;
+        }
         const blocked = agent.beforeTool?.(call.toolName);
-        if (blocked) throw new Error(blocked);
+        if (blocked) {
+          throw new Error(blocked);
+        }
 
         // Виконання відбувається в нашій програмі, після перевірки дозволу.
         result = await agent.runTool(call.toolName, call.input);
@@ -61,12 +78,14 @@ export async function runAgent(agent: Agent, task: string) {
       console.log(`Результат ${call.toolName}:`, result);
       messages.push({
         role: 'tool',
-        content: [{
-          type: 'tool-result',
-          toolCallId: call.toolCallId,
-          toolName: call.toolName,
-          output: { type: 'json', value: result },
-        }],
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            output: { type: 'json', value: result },
+          },
+        ],
       });
     }
 
