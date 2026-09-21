@@ -13,6 +13,7 @@ const replyInput = z.object({ customerId: customer, text: z.string().min(1).max(
 export const SEND_REPLY_DESCRIPTION = 'Надішли клієнту відповідь після перевірки списань.';
 // Тут лише описи. execute відсутній: тули запускає наш runtime.ts.
 export const tools = {
+  readSkill: readSkillTool,
   getCharges: tool({ description: 'Поверни списання клієнта з локальних навчальних даних.', inputSchema: chargesInput }),
   sendReply: tool({ description: SEND_REPLY_DESCRIPTION, inputSchema: replyInput }),
 };
