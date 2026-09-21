@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "tsx --env-file-if-exists=.env src/main.ts",
-    "test": "node --import tsx --test --test-reporter=spec test/harness.test.ts",
+    "test": "node --import tsx --test --experimental-test-isolation=none --test-reporter=spec test/harness.test.ts",
     "check": "tsc --noEmit && npm test"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { MockLanguageModelV3 } from 'ai/test';
 import { runAgent } from '../src/harness.ts';
 import { billing } from '../src/billing/agent.ts';
+
+// У тестах читаємо назви перевірок. Покроковий лог видно через npm start.
+mock.method(console, 'log', () => {});
 
 type Reply = Awaited<ReturnType<MockLanguageModelV3['doGenerate']>>;
 
