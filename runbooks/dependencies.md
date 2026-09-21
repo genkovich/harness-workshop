@@ -49,3 +49,5 @@ npm view @types/node version
 Після зміни залежностей проганяємо типи й тести кожної контрольної гілки, а готове рішення — на Windows, macOS і Linux. Для Node 26 перевіряємо також команду setup:check. CI не робить запитів до живої моделі й не потребує API-ключів.
 
 Модель qwen/qwen3.8-27b:free перевірено в [публічному каталозі OpenRouter](https://openrouter.ai/api/v1/models): ціни prompt/completion дорівнюють 0, supported_parameters містить tools. Це не доказ доступності для конкретного акаунта: її перевіряє учасник командою npm run setup:check.
+
+HN Search: https://hn.algolia.com/api, без додаткових ключів. Вбудовані fetch та node:fs/promises; залежності для нового агента не додавалися. Документацію перевірено через Context7; живий пошук та читання коментарів — окремими HTTP-запитами.
