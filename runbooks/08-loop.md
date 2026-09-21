@@ -33,7 +33,7 @@ maxSteps?: number;
 
 `?` у `maxSteps?: number` означає необовʼязкове поле. `agent.maxSteps ?? defaultMaxSteps` бере число з налаштувань, а якщо воно не задане — `defaultMaxSteps`, тобто 10. Один крок тут дорівнює **одному виклику моделі**, хоча у відповіді може бути кілька інструментів. Це інше обмеження, ніж `maxRetries`: retries повторювали б невдалий HTTP-запит, а кроки продовжують роботу з новою історією.
 
-Залиш створення messages перед циклом. Блок від generateText до виконання інструментів обгорни в:
+Залиш створення messages перед циклом. Усередині `runAgent` обгорни блок від `generateText` до додавання результатів інструментів у цикл нижче. Допоміжні функції `executeTool`, `addAssistantMessages` та `addToolResult` залиш поза `runAgent`:
 
 ```ts
 for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
@@ -112,12 +112,15 @@ import {
   type ModelMessage,
   type ToolSet,
   type JSONValue,
+  type TypedToolCall,
 } from 'ai';
 
 const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
 
 const defaultMaxSteps = 10;
+
+type ToolCall = TypedToolCall<ToolSet>;
 
 export type Agent = {
   model: LanguageModel;
@@ -145,7 +148,7 @@ export async function runAgent(agent: Agent, task: string) {
     });
 
     if (process.env.TRACE === '1') {
-      console.log('HTTP-запит:', reply.request.body);
+      console.log('HTTP-запит:', reply.finalStep.request.body);
     }
     if (reply.finishReason === 'length') {
       throw new Error('Відповідь обрізано. Тули не виконуємо.');
@@ -157,40 +160,14 @@ export async function runAgent(agent: Agent, task: string) {
       return { reason: 'final', text: reply.text, messages };
     }
 
-    // Спочатку запит моделі на виклик тула, потім наш результат.
-    // Беремо лише assistant: помилки тулів повертаємо нижче самі.
-    messages.push(
-      ...reply.response.messages.filter((message) => message.role === 'assistant'),
-    );
+    addAssistantMessages(messages, reply.responseMessages);
 
     for (const call of reply.toolCalls) {
       console.log(`Модель просить ${call.toolName}:`, call.input);
-      let result;
-
-      try {
-        // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-        if (call.invalid) {
-          throw call.error;
-        }
-        // Виконання відбувається в нашій програмі, а не в SDK.
-        result = await agent.runTool(call.toolName, call.input);
-      } catch (error) {
-        // Помилка теж результат: модель отримає її в наступному запиті.
-        result = { error: error instanceof Error ? error.message : String(error) };
-      }
+      const result = await executeTool(agent, call);
 
       console.log(`Результат ${call.toolName}:`, result);
-      messages.push({
-        role: 'tool',
-        content: [
-          {
-            type: 'tool-result',
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            output: { type: 'json', value: result },
-          },
-        ],
-      });
+      addToolResult(messages, call, result);
     }
 
     console.log(`Додали результати. Повідомлень в історії: ${messages.length}.`);
@@ -198,6 +175,57 @@ export async function runAgent(agent: Agent, task: string) {
 
   console.log('Зупинка: досягли ліміту кроків. Задача може бути незавершена.');
   return { reason: 'limit', text: '', messages };
+}
+
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    // Не передаємо виконавцю виклик, який SDK позначив некоректним.
+    if (call.invalid) {
+      throw call.error;
+    }
+
+    // await потрібен, щоб catch перехопив і помилку асинхронної функції.
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    // Помилку повертаємо як дані для наступного запиту моделі.
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
+  }
+}
+
+function addAssistantMessages(
+  messages: ModelMessage[],
+  responseMessages: ModelMessage[],
+) {
+  for (const message of responseMessages) {
+    if (message.role === 'assistant') {
+      messages.push(message);
+    }
+  }
+}
+
+function addToolResult(
+  messages: ModelMessage[],
+  call: ToolCall,
+  result: JSONValue,
+) {
+  messages.push({
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        output: {
+          type: 'json',
+          value: result,
+        },
+      },
+    ],
+  });
 }
 ```
 

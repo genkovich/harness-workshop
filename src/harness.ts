@@ -4,10 +4,13 @@ import {
   type ModelMessage,
   type ToolSet,
   type JSONValue,
+  type TypedToolCall,
 } from 'ai';
 
 const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
+
+type ToolCall = TypedToolCall<ToolSet>;
 
 export type Agent = {
   model: LanguageModel;
@@ -33,7 +36,7 @@ export async function runAgent(agent: Agent, task: string) {
   });
 
   if (process.env.TRACE === '1') {
-    console.log('HTTP-запит:', reply.request.body);
+    console.log('HTTP-запит:', reply.finalStep.request.body);
   }
   if (reply.finishReason === 'length') {
     throw new Error('Відповідь обрізано. Тули не виконуємо.');
@@ -47,19 +50,7 @@ export async function runAgent(agent: Agent, task: string) {
 
   for (const call of reply.toolCalls) {
     console.log(`Модель просить ${call.toolName}:`, call.input);
-    let result;
-
-    try {
-      // SDK перевірив аргументи за схемою. Некоректний виклик не виконуємо.
-      if (call.invalid) {
-        throw call.error;
-      }
-      // Виконання відбувається в нашій програмі, а не в SDK.
-      result = await agent.runTool(call.toolName, call.input);
-    } catch (error) {
-      // Помилка теж результат: модель отримає її в наступному запиті.
-      result = { error: error instanceof Error ? error.message : String(error) };
-    }
+    const result = await executeTool(agent, call);
 
     console.log(`Результат ${call.toolName}:`, result);
 
@@ -68,4 +59,23 @@ export async function runAgent(agent: Agent, task: string) {
 
   console.log('Модель ще не отримала результат. Наступний запит додамо далі.');
   return { reason: 'tool-result', text: '', messages };
+}
+
+async function executeTool(agent: Agent, call: ToolCall): Promise<JSONValue> {
+  try {
+    // Не передаємо виконавцю виклик, який SDK позначив некоректним.
+    if (call.invalid) {
+      throw call.error;
+    }
+
+    // await потрібен, щоб catch перехопив і помилку асинхронної функції.
+    return await agent.runTool(call.toolName, call.input);
+  } catch (error) {
+    // Помилку повертаємо як дані для наступного запиту моделі.
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
+
+    return { error: String(error) };
+  }
 }
