@@ -46,12 +46,12 @@ export const news = {
   tools: {
     searchStories: tool({
       // Шукає теми за запитом і періодом.
-      description: 'Find up to 5 HN discussions by topic and time range. Rephrase if results are scarce.',
+      description: 'Find up to 10 HN discussions by topic and time range. Rephrase if results are scarce.',
       inputSchema: searchInput,
     }),
     readDiscussion: tool({
       // Читає одну порцію коментарів.
-      description: 'Read up to 3 comments. Use nextOffset to request another page unless it is null.',
+      description: 'Read up to 10 comments. Use nextOffset to request another page unless it is null.',
       inputSchema: discussionInput,
     }),
     saveDigest: tool({
