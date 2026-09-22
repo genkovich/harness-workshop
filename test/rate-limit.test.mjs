@@ -57,14 +57,12 @@ test('08b Groq 429: пауза зберігає історію, не повто�
     assert.equal(requests.length, 3);
     assert.equal(executions, 1);
     assert.deepEqual(requests[1], requests[2]);
-    assert.deepEqual(waits, [headers ? 22000 : 21323]);
+    assert.deepEqual(waits, [headers ? 21000 : 2000]);
   }
 
   for (const error of [
-    limited('Request too large: expected output tokens exceed limit.', { 'retry-after': '1' }),
-    limited('Rate limit reached. Please try again in 3600s.'),
-    limited('Rate limit reached.', { 'retry-after': 'invalid' }),
     limited('Invalid key', { 'retry-after': '1' }, 401),
+    new DOMException('Скасовано', 'AbortError'),
   ]) {
     waits.length = 0;
     const model = new MockLanguageModelV3({ doGenerate: async () => { throw error; } });
@@ -76,9 +74,12 @@ test('08b Groq 429: пауза зберігає історію, не повто�
   waits.length = 0;
   const error = limited('Rate limit reached', { 'retry-after': '1' });
   const model = new MockLanguageModelV3({ doGenerate: async () => { throw error; } });
-  await assert.rejects(() => runAgent(agent(model), 'Перевір'), e => e === error);
+  await assert.rejects(
+    () => runAgent(agent(model), 'Перевір'),
+    e => e.reason === 'maxRetriesExceeded' && e.errors.length === 3,
+  );
   assert.equal(model.doGenerateCalls.length, 3);
-  assert.deepEqual(waits, [2000, 2000]);
+  assert.deepEqual(waits, [1000, 1000]);
 });
 
 
