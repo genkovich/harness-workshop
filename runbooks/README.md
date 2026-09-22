@@ -21,6 +21,10 @@
 | [11. Skills](11-skills.md) | step-10-context | step-11-skills | 30 |
 | [12. Дозвіл](12-guard.md) | step-11-skills | step-12-guard | 32 |
 
+## Вибір моделі на першому занятті
+
+У [темі 01](01-model.md#обери-провайдера) є приклади для OpenAI, Anthropic, Grok від xAI та OpenRouter: пакет, змінні `.env` і код підключення. Основний маршрут із готовими тестами використовує Groq. Grok і Groq — різні сервіси.
+
 ## Тести й налагодження
 
 [Усі сценарії агента](../test/harness.test.mjs) · [середовище та ранбуки](../test/runbooks.test.mjs) · [підміна HTTP](../test/groq.mock.mjs) · [дані та повтори після 429](../test/rate-limit.test.mjs).
