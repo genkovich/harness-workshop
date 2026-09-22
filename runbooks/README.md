@@ -15,7 +15,7 @@
 | [06. Виконання](06-execute.md) | step-05-call | step-06-execute | 17 |
 | [07. Результат в історії](07-history.md) | step-06-execute | step-07-history | 18 |
 | [08. Цикл і зупинка](08-loop.md) | step-07-history | step-08-loop | 25 |
-| [08б. Менше даних і пауза при 429](08b-limits.md) | step-08-loop | step-08b-limits | 27 |
+| [08б. Повтор тимчасово невдалого запиту](08b-limits.md) | step-08-loop | step-08b-limits | 27 |
 | [09. Експеримент з описом](09-description.md) | step-08b-limits | step-09-description | 28 |
 | [10. Правила з файла](10-context.md) | step-09-description | step-10-context | 29 |
 | [11. Skills](11-skills.md) | step-10-context | step-11-skills | 30 |
