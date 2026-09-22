@@ -108,6 +108,6 @@ test('08b Дані: пʼять тем, три короткі коментарі 
   const last = await readDiscussion(1, first.nextOffset);
   assert.equal(last.comments.length, 1);
   assert.equal(last.nextOffset, null);
-  assert.match(news.tools.searchStories.description, /5 дискусій/);
-  assert.match(news.tools.readDiscussion.description, /3 коментарі/);
+  assert.match(news.tools.searchStories.description, /up to 5 HN discussions/);
+  assert.match(news.tools.readDiscussion.description, /up to 3 comments/);
 });
