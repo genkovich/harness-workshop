@@ -15,7 +15,7 @@ const messages: ModelMessage[] = [{ role: 'user', content: task }];
 
 const reply = await generateText({
   model,
-  system: 'Відповідай українською.',
+  system: 'Reply in Ukrainian.',
   messages,
   maxRetries: 0,
   maxOutputTokens,
