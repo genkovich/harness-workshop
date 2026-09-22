@@ -40,7 +40,7 @@ const call = (name, input, id = "call_1") => ({
 });
 test("03 Запит: Текстова відповідь завершує роботу після одного запиту", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
-  const result = await runAgent({ model, system: "Відповідай українською." }, "Привіт");
+  const result = await runAgent({ model, system: "Reply in Ukrainian." }, "Привіт");
   assert.equal(result.text, "Готово.");
   assert.equal(result.reason, "final");
   assert.equal(model.doGenerateCalls.length, 1);

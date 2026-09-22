@@ -10,7 +10,7 @@ if (!task) {
 try {
   const result = await runAgent(
     {
-      system: 'Відповідай українською.',
+      system: 'Reply in Ukrainian.',
       model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
     },
     task,
