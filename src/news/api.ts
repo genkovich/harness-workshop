@@ -4,10 +4,10 @@ const base = 'https://hn.algolia.com/api/v1/';
 const millisecondsPerSecond = 1_000;
 const secondsPerDay = 86_400;
 const requestTimeoutMs = 15_000;
-const searchLimit = 5;
+const searchLimit = 10;
 const defaultSearchDays = 7;
-const commentsPerPage = 3;
-const maxCommentCharacters = 400;
+const commentsPerPage = 10;
+const maxCommentCharacters = 1_000;
 
 // Коментар може містити відповіді — інші коментарі в children.
 type Comment = {
