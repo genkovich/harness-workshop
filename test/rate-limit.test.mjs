@@ -83,31 +83,31 @@ test('08b Groq 429: пауза зберігає історію, не повто�
 });
 
 
-test('08b Дані: пʼять тем, три короткі коментарі й наступна порція', async t => {
+test('08b Дані: повтори запиту не змінюють пошук і перехід між порціями', async t => {
   const { searchStories, readDiscussion } = await import('../src/news/api.ts');
   const { news } = await import('../src/news/agent.ts');
-  const hits = Array.from({ length: 9 }, (_, i) => ({
+  const hits = Array.from({ length: 12 }, (_, i) => ({
     objectID: String(i + 1), title: 'Тема', url: null,
     points: 1, num_comments: 10, created_at: '2026-09-22',
   }));
-  const children = Array.from({ length: 4 }, (_, i) => ({
-    id: i + 20, author: 'Автор', text: 'x'.repeat(900), children: [],
+  const children = Array.from({ length: 11 }, (_, i) => ({
+    id: i + 20, author: 'Автор', text: 'x'.repeat(1_200), children: [],
   }));
   t.mock.method(globalThis, 'fetch', async url => {
     if (String(url).includes('search_by_date')) {
-      assert.equal(new URL(url).searchParams.get('hitsPerPage'), '5');
+      assert.equal(new URL(url).searchParams.get('hitsPerPage'), '10');
       return Response.json({ hits });
     }
     return Response.json({ id: 1, type: 'story', title: 'Тема', children });
   });
-  assert.equal((await searchStories('agents')).length, 5);
+  assert.equal((await searchStories('agents')).length, 10);
   const first = await readDiscussion(1);
-  assert.equal(first.comments.length, 3);
-  assert.ok(first.comments.every(comment => comment.text.length === 400 && comment.truncated));
-  assert.equal(first.nextOffset, 3);
+  assert.equal(first.comments.length, 10);
+  assert.ok(first.comments.every(comment => comment.text.length === 1_000 && comment.truncated));
+  assert.equal(first.nextOffset, 10);
   const last = await readDiscussion(1, first.nextOffset);
   assert.equal(last.comments.length, 1);
   assert.equal(last.nextOffset, null);
-  assert.match(news.tools.searchStories.description, /up to 5 HN discussions/);
-  assert.match(news.tools.readDiscussion.description, /up to 3 comments/);
+  assert.match(news.tools.searchStories.description, /up to 10 HN discussions/);
+  assert.match(news.tools.readDiscussion.description, /up to 10 comments/);
 });
