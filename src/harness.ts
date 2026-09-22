@@ -1,6 +1,5 @@
 import {
   generateText,
-  APICallError,
   type LanguageModel,
   type ModelMessage,
   type ToolSet,
@@ -12,11 +11,6 @@ const maxOutputTokens = 512;
 const modelTimeoutMs = 60_000;
 
 const defaultMaxSteps = 10;
-const maxRateLimitRetries = 2;
-const maxRetryDelayMs = 60_000;
-const retrySafetyMs = 1_000;
-const millisecondsPerSecond = 1_000;
-
 
 type ToolCall = TypedToolCall<ToolSet>;
 
@@ -38,7 +32,16 @@ export async function runAgent(agent: Agent, task: string) {
   for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
 
-    const reply = await requestModel(agent, messages);
+    const reply = await generateText({
+      model: agent.model,
+      system: agent.system,
+      messages,
+      tools: agent.tools,
+      maxRetries: 2,
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(modelTimeoutMs),
+      include: { requestBody: true },
+    });
 
     if (process.env.TRACE === '1') {
       console.log('HTTP-запит:', reply.finalStep.request.body);
@@ -124,57 +127,4 @@ function addToolResult(
       },
     ],
   });
-}
-
-async function requestModel(agent: Agent, messages: ModelMessage[]) {
-  let retries = 0;
-
-  while (true) {
-    try {
-      return await generateText({
-        model: agent.model,
-        system: agent.system,
-        messages,
-        tools: agent.tools,
-        maxRetries: 0,
-        maxOutputTokens,
-        abortSignal: AbortSignal.timeout(modelTimeoutMs),
-        include: { requestBody: true },
-      });
-    } catch (error) {
-      const waitMs = getRetryDelayMs(error);
-      if (waitMs === null || retries >= maxRateLimitRetries) {
-        throw error;
-      }
-
-      retries += 1;
-      const seconds = Math.ceil(waitMs / millisecondsPerSecond);
-      console.log(`Groq 429: чекаємо ${seconds} с. Повтор ${retries}/${maxRateLimitRetries} з тією самою історією.`);
-      await new Promise(resolve => setTimeout(resolve, waitMs));
-    }
-  }
-}
-
-function getRetryDelayMs(error: unknown): number | null {
-  if (!APICallError.isInstance(error) || error.statusCode !== 429) {
-    return null;
-  }
-
-  // Завеликий запит не стане меншим після паузи.
-  if (/request too large|expected output tokens exceed/i.test(error.message)) {
-    return null;
-  }
-
-  let seconds = Number(error.responseHeaders?.['retry-after']);
-  if (!Number.isFinite(seconds)) {
-    const match = /try again in ([\d.]+)s/i.exec(error.message);
-    seconds = Number(match?.[1]);
-  }
-
-  const waitMs = Math.ceil(seconds * millisecondsPerSecond) + retrySafetyMs;
-  if (!Number.isFinite(seconds) || seconds < 0 || waitMs > maxRetryDelayMs) {
-    return null;
-  }
-
-  return waitMs;
 }
