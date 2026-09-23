@@ -24,6 +24,7 @@ skills/digest/SKILL.md уже лежить у заготовці. Створи s
 ```ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
+// Спершу віддаємо назву й опис. Повний текст модель читає окремим тулом.
 const directory = new URL('../skills/', import.meta.url);
 ```
 
@@ -35,13 +36,16 @@ const directory = new URL('../skills/', import.meta.url);
 
 ```ts
 export const skills = readdirSync(directory)
-  .filter(name => existsSync(new URL(`${name}/SKILL.md`, directory)))
-  .map(name => {
-    const text = readFileSync(new URL(`${name}/SKILL.md`, directory), 'utf8');
+  .filter((name) => existsSync(new URL(`${name}/SKILL.md`, directory)))
+  .map((name) => {
+    const file = new URL(`${name}/SKILL.md`, directory);
+    const text = readFileSync(file, 'utf8');
     const description = /^description: (.+)$/m.exec(text)?.[1];
+
     if (!description) {
       throw new Error(`Немає description у skill ${name}`);
     }
+
     return { name, description, text };
   });
 ```
@@ -52,7 +56,8 @@ export const skills = readdirSync(directory)
 
 ```ts
 export function readSkill(name: string) {
-  const skill = skills.find(skill => skill.name === name);
+  // Обираємо зі знайдених skills, а не відкриваємо шлях від моделі.
+  const skill = skills.find((skill) => skill.name === name);
   if (!skill) {
     throw new Error(`Невідомий skill: ${name}`);
   }
@@ -73,11 +78,13 @@ const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).
 
 `descriptions` обʼєднує лише імена та короткі описи через перенос рядка. Це підказка моделі, яку інструкцію можна попросити через `readSkill`. Повний `text` повертається в результаті інструмента тільки після вибору skill — так працює поступове додавання контексту в цій практиці.
 
-Заміни context: projectContext на:
+У `news` заміни рядок `context: projectContext,` на:
 
 ```ts
-context: `${projectContext}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
 ```
+
+Каталог skills стає ще одним блоком першого повідомлення, між правилами і `<task>`. Як і `AGENTS.md`, це тексти проєкту, тож їм місце в першому `user`.
 
 У news.tools додай опис:
 
@@ -222,13 +229,14 @@ const system = [
   'Sources: link to stories and comments. Do not invent quotes or objections.',
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
+  'Context: tagged blocks in the first message are project instructions; <task> is the request.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${projectContext}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {

@@ -23,10 +23,16 @@ export type Agent = {
   maxSteps?: number;
 };
 
+// Історія починається з одного user-повідомлення: спершу контекст проєкту, в кінці задача.
+// Далі цикл лише дописує відповіді моделі й результати тулів, а цей початок не змінюється.
+function firstMessage(agent: Agent, task: string): ModelMessage {
+  const parts = agent.context ? [agent.context] : [];
+  parts.push(`<task>\n${task}\n</task>`);
+  return { role: 'user', content: parts.join('\n\n') };
+}
+
 export async function runAgent(agent: Agent, task: string) {
-  const messages: ModelMessage[] = [
-    { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
-  ];
+  const messages: ModelMessage[] = [firstMessage(agent, task)];
 
   for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
