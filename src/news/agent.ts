@@ -3,7 +3,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
-import { readFileSync } from 'node:fs';
+import { loadContext } from '../context.ts';
 
 const maxQueryCharacters = 120;
 const maxSearchDays = 30;
@@ -22,7 +22,7 @@ const discussionInput = z.object({
 const digestInput = z.object({
   text: z.string().trim().min(1).max(maxDigestCharacters),
 });
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
+const projectContext = loadContext();
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
 const system = [
@@ -40,7 +40,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: rules,
+  context: projectContext,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
