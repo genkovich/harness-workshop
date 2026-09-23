@@ -174,15 +174,19 @@ test("08 Обрізання: Обрізані аргументи не доход
   await assert.rejects(() => runAgent(options, "Перевір"), /обрізано/);
   assert.equal(executed, false);
 });
-test("10 Контекст: AGENTS.md та rules завантажуються в user, system і задача залишаються окремими", async () => {
+test("10 Контекст: перше user-повідомлення = AGENTS.md, rules, потім задача; system окремо", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
   await runAgent(await agent({ model }), "Перевір джерела");
   const prompt = model.doGenerateCalls[0].prompt;
   const user = prompt.find(message => message.role === 'user');
   const system = prompt.find(message => message.role === 'system');
-  assert.match(JSON.stringify(user), /Огляд обговорень HN/);
-  assert.match(JSON.stringify(user), /When comments disagree/);
-  assert.match(JSON.stringify(user), /Перевір джерела/);
+  const text = user.content.map(part => part.text).join('');
+  const project = text.indexOf('<project source="AGENTS.md">');
+  const rule = text.indexOf('<rule source="rules/sources.md">');
+  const task = text.indexOf('<task>\nПеревір джерела\n</task>');
+  assert.ok(project >= 0 && rule > project && task > rule, text);
+  assert.match(text, /Огляд обговорень HN/);
+  assert.match(text, /When comments disagree/);
   assert.doesNotMatch(JSON.stringify(system), /When comments disagree/);
 });
 test('10 Rules: усі md-файли завантажуються за назвою; сторонні файли й каталоги не читаються', async t => {
@@ -198,6 +202,8 @@ test('10 Rules: усі md-файли завантажуються за назв�
   const context = loadContext(rootUrl);
   assert.ok(context.indexOf('PROJECT_RULES') < context.indexOf('FIRST_RULE'));
   assert.ok(context.indexOf('FIRST_RULE') < context.indexOf('SECOND_RULE'));
+  assert.match(context, /<project source="AGENTS.md">\nPROJECT_RULES\n<\/project>/);
+  assert.match(context, /<rule source="rules\/a.md">\nFIRST_RULE\n<\/rule>/);
   assert.doesNotMatch(context, /MUST_NOT_LOAD/);
   await rm(join(directory, 'AGENTS.md'));
   assert.throws(() => loadContext(rootUrl), { code: 'ENOENT' });
@@ -207,6 +213,7 @@ test("11 Skills: Спершу опис skill, повний текст лише �
     doGenerate: [reply([call("readSkill", { name: "digest" })]), final]
   });
   await runAgent(await agent({ model }), "Прочитай digest");
+  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /<skills>\\ndigest: /);
   assert.doesNotMatch(
     JSON.stringify(model.doGenerateCalls[0].prompt),
     /Для пошуку спробуй англомовні запити/
