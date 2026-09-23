@@ -1,10 +1,10 @@
 import { test, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGroq } from "@ai-sdk/groq";
 import { MockLanguageModelV3 } from "ai/test";
 mock.method(console, "log", () => {
@@ -174,10 +174,33 @@ test("08 Обрізання: Обрізані аргументи не доход
   await assert.rejects(() => runAgent(options, "Перевір"), /обрізано/);
   assert.equal(executed, false);
 });
-test("10 Контекст: AGENTS.md зʼявляється в першому повідомленні", async () => {
+test("10 Контекст: AGENTS.md та rules завантажуються в user, system і задача залишаються окремими", async () => {
   const model = new MockLanguageModelV3({ doGenerate: final });
-  await runAgent(await agent({ model }), "Перевір");
-  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Огляд обговорень HN/);
+  await runAgent(await agent({ model }), "Перевір джерела");
+  const prompt = model.doGenerateCalls[0].prompt;
+  const user = prompt.find(message => message.role === 'user');
+  const system = prompt.find(message => message.role === 'system');
+  assert.match(JSON.stringify(user), /Огляд обговорень HN/);
+  assert.match(JSON.stringify(user), /When comments disagree/);
+  assert.match(JSON.stringify(user), /Перевір джерела/);
+  assert.doesNotMatch(JSON.stringify(system), /When comments disagree/);
+});
+test('10 Rules: усі md-файли завантажуються за назвою; сторонні файли й каталоги не читаються', async t => {
+  const { loadContext } = await import('../src/context.ts');
+  const directory = await mkdtemp(join(tmpdir(), 'harness-rules-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, 'rules', 'nested.md'), { recursive: true });
+  await writeFile(join(directory, 'AGENTS.md'), 'PROJECT_RULES');
+  await writeFile(join(directory, 'rules', 'b.md'), 'SECOND_RULE');
+  await writeFile(join(directory, 'rules', 'a.md'), 'FIRST_RULE');
+  await writeFile(join(directory, 'rules', 'skip.txt'), 'MUST_NOT_LOAD');
+  const rootUrl = pathToFileURL(directory + '/');
+  const context = loadContext(rootUrl);
+  assert.ok(context.indexOf('PROJECT_RULES') < context.indexOf('FIRST_RULE'));
+  assert.ok(context.indexOf('FIRST_RULE') < context.indexOf('SECOND_RULE'));
+  assert.doesNotMatch(context, /MUST_NOT_LOAD/);
+  await rm(join(directory, 'AGENTS.md'));
+  assert.throws(() => loadContext(rootUrl), { code: 'ENOENT' });
 });
 test("11 Skills: Спершу опис skill, повний текст лише після readSkill", async () => {
   const model = new MockLanguageModelV3({
@@ -461,4 +484,25 @@ test('08 HN: помилка API доходить до моделі; наступ
   assert.deepEqual(queries,['harness','coding agents']);
   assert.match(JSON.stringify(model.doGenerateCalls[1].prompt), /HTTP 503/);
   assert.match(JSON.stringify(model.doGenerateCalls[2].prompt), /Harness fixture/);
+});
+
+
+test('12 Settings: лише явний дозвіл пропускає запис; налаштування не потрапляють у контекст', async t => {
+  const { news } = await import('../src/news/agent.ts');
+  const previous = process.env.APPROVED;
+  t.after(() => {
+    if (previous === undefined) delete process.env.APPROVED;
+    else process.env.APPROVED = previous;
+  });
+  for (const value of [undefined, '0', 'true', 'yes', '']) {
+    if (value === undefined) delete process.env.APPROVED;
+    else process.env.APPROVED = value;
+    assert.equal(news.beforeTool('saveDigest'), 'blocked, ask the user');
+    assert.equal(news.beforeTool('searchStories'), null);
+  }
+  process.env.APPROVED = '1';
+  assert.equal(news.beforeTool('saveDigest'), null);
+  const model = new MockLanguageModelV3({ doGenerate: final });
+  await runAgent(await agent({ model }), 'Перевір');
+  assert.doesNotMatch(JSON.stringify(model.doGenerateCalls[0].prompt), /APPROVED|allowDigestWrite|permissions/);
 });
