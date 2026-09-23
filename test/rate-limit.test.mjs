@@ -58,6 +58,7 @@ test('08b API: тимчасові 429 і 503 повторюються без п�
     assert.equal(executions, 1);
     assert.deepEqual(requests[1], requests[2]);
     assert.deepEqual(waits, [headers ? 21000 : 2000]);
+    t.diagnostic(`HTTP ${statusCode}: виклик тула → збій → повтор → відповідь. Звернень до моделі: ${requests.length}; виконань тула: ${executions}.`);
   }
 
   for (const error of [
@@ -73,6 +74,8 @@ test('08b API: тимчасові 429 і 503 повторюються без п�
     assert.deepEqual(waits, []);
   }
 
+  t.diagnostic('HTTP 400/401/403 і скасування: одна спроба, без повторів.');
+
   waits.length = 0;
   const error = limited('Rate limit reached', { 'retry-after': '1' });
   const model = new MockLanguageModelV3({ doGenerate: async () => { throw error; } });
@@ -82,6 +85,7 @@ test('08b API: тимчасові 429 і 503 повторюються без п�
   );
   assert.equal(model.doGenerateCalls.length, 3);
   assert.deepEqual(waits, [1000, 1000]);
+  t.diagnostic('Збій не минув: 3 невдалі спроби → помилка. Агент зупинився.');
 });
 
 
