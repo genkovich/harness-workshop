@@ -309,27 +309,6 @@ test('04 Описи: три схеми перевіряють аргументи
   assert.equal(saveDigest.inputSchema.safeParse({ text: '' }).success, false);
 });
 
-test('09 Description: змінений опис доходить до моделі, виконання лишається доступним', async (t) => {
-  const originalDirectory = process.cwd();
-  const temporary = await mkdtemp(join(tmpdir(), 'harness-description-'));
-  process.chdir(temporary);
-  t.after(async () => {
-    process.chdir(originalDirectory);
-    await rm(temporary, { recursive: true, force: true });
-  });
-  const { news } = await import('../src/news/agent.ts');
-  const model = new MockLanguageModelV3({ doGenerate: [
-    reply([call('saveDigest', { text: 'Перевірка опису' })]), final,
-  ] });
-  await runAgent(await agent({ model, beforeTool: () => null, tools: {
-    ...news.tools, saveDigest: { ...news.tools.saveDigest, description: 'never call this' },
-  } }), 'Перевір опис');
-  const sent = model.doGenerateCalls[0].tools.find(tool => tool.name === 'saveDigest');
-  assert.equal(sent.description, 'never call this');
-  assert.equal((await readFile('.data/digest.md', 'utf8')).trim(), 'Перевірка опису');
-  // Це перевірка доставки опису й доступності функції, а не слухняності живої моделі.
-});
-
 test('08 Groq: HTTP tool call повертається наступним запитом із тим самим id', async () => {
   const requests = [];
   const router = createGroq({ apiKey: 'offline-test-key', fetch: async (url, options) => {

@@ -1,6 +1,6 @@
 # 08б. Повтор запиту після збою
 
-[Усі теми](README.md) · [Попередня](08-loop.md) · [Наступна](09-description.md)
+[Усі теми](README.md) · [Попередня](08-loop.md) · [Наступна](10-context.md)
 
 **Перед початком:** `step-08-loop`. **Готовий результат:** `step-08b-limits`. Назва гілки історична: тут додаємо retry, окремої вправи про квоти немає. Змінюємо лише `src/harness.ts`.
 
@@ -91,10 +91,10 @@ git commit -m "Дозволити обмежені повтори запиту"
 git add src
 git commit -m "Моя спроба етапу 08б"
 git fetch origin
-git switch -c work-09 origin/step-08b-limits
+git switch -c work-10 origin/step-08b-limits
 ```
 
-Якщо змін для коміту немає, пропусти його. Далі відкрий [експеримент з описом](09-description.md).
+Якщо змін для коміту немає, пропусти його. Далі відкрий [контекст: AGENTS.md і rules](10-context.md).
 
 Довідка: [maxRetries в AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text#max-retries).
 
