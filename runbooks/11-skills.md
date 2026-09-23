@@ -25,7 +25,7 @@ Skill це окрема інструкція для одного типу зад
 Запит 1
   system     … Skills: only when the task needs what a <skills> entry describes, call readSkill …
   user       <project …> <rule …>
-             <skills>
+             <skills source="skills/">
              digest: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
              </skills>
              <task> Склади дайджест: … </task>
@@ -43,18 +43,30 @@ Skill це окрема інструкція для одного типу зад
 
 Зараз модель не знає про `SKILL.md`. Після етапу:
 
-- `src/skills.ts` читає папку `skills/`, дістає з кожного `SKILL.md` опис і повний текст. `readSkill(name)` повертає текст за іменем.
-- `src/news/agent.ts` кладе описи в блок `<skills>`, додає рядок `Skills:` у `system`, тул `readSkill` і його виконання в `runTool`.
+- `src/skills.ts` читає папку `skills/`, дістає з кожного `SKILL.md` опис і повний текст. `readSkill(name)` повертає текст за іменем, `skillCatalog()` складає блок `<skills>` з описами.
+- `src/context.ts` віддає назовні `section()`, щоб каталог skills мав той самий формат, що й правила.
+- `src/news/agent.ts` додає каталог до контексту, рядок `Skills:` у `system`, тул `readSkill` і його виконання в `runTool`.
 - Цикл у `harness.ts` не змінюється.
 
 ## Маленькі зміни
 
-### 1. Каталог skills
+### 1. Спільна обгортка для блоків
+
+Каталог skills стане ще одним блоком першого повідомлення, поруч із `<project>` і `<rule>`. Обгортка для блоків у нас уже є: `section()` з етапу 10. Щоб скористатися нею з іншого файла, у `src/context.ts` заміни рядок `function section(tag: string, source: string, text: string) {` на:
+
+```ts
+export function section(tag: string, source: string, text: string) {
+```
+
+Так усі блоки контексту мають однаковий вигляд, і формат задано в одному місці.
+
+### 2. Каталог skills
 
 Створи `src/skills.ts`:
 
 ```ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { section } from './context.ts';
 
 // Спершу віддаємо назву й опис. Повний текст модель читає окремим тулом.
 const directory = new URL('../skills/', import.meta.url);
@@ -82,7 +94,7 @@ export const skills = readdirSync(directory)
 
 `readdirSync` дає назви в папці, `.filter` лишає ті, де є `SKILL.md`. Імʼя skill це назва його папки, у нас `digest`. Вираз `/^description: (.+)$/m` шукає рядок `description:`; прапорець `m` дозволяє `^` і `$` працювати для кожного рядка, `?.[1]` дістає текст після двокрапки. Це просте читання одного рядка, повний YAML-парсер нам не потрібен. Без опису модель не зможе обрати skill, тож такий файл одразу дає помилку.
 
-### 2. Читання за іменем
+### 3. Читання за іменем
 
 ```ts
 export function readSkill(name: string) {
@@ -97,20 +109,40 @@ export function readSkill(name: string) {
 
 Модель передає лише імʼя, і ми шукаємо його в уже зібраному каталозі. Якщо модель спробує `../../.env`, отримає «Невідомий skill», а диск ми не читаємо. Помилку цикл поверне моделі як результат тула, як ми зробили на етапі 06.
 
+### 4. Блок для першого повідомлення
+
+У кінці `src/skills.ts` додай:
+
+```ts
+// Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
+export function skillCatalog() {
+  const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
+  return section('skills', 'skills/', lines.join('\n'));
+}
+```
+
+Один рядок на skill: імʼя, двокрапка, опис. Саме за цим рядком модель вирішуватиме, чи потрібна їй повна інструкція. Поля `text` тут немає, тож повний текст у контекст не потрапить.
+
 Перевір каталог окремо від моделі:
 
 ```bash
-node --import tsx --input-type=module -e "import { skills } from './src/skills.ts'; console.log(skills.map(s => s.name + ': ' + s.description));"
+node --import tsx --input-type=module -e "import { skillCatalog } from './src/skills.ts'; console.log(skillCatalog());"
 ```
 
-Очікуємо один рядок: `digest: Як відібрати дискусії …`.
+Очікуємо:
 
-### 3. Описи skills у контексті
+```text
+<skills source="skills/">
+digest: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
+</skills>
+```
+
+### 5. Каталог у контексті агента
 
 У `src/news/agent.ts` під рядком `import { loadContext } from '../context.ts';` додай:
 
 ```ts
-import { skills, readSkill } from '../skills.ts';
+import { readSkill, skillCatalog } from '../skills.ts';
 ```
 
 Під схемою `digestInput` додай схему аргументів нового тула:
@@ -121,23 +153,15 @@ const skillInput = z.object({
 });
 ```
 
-Під рядком `const projectContext = loadContext();` склади список описів:
-
-```ts
-const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
-```
-
-Один рядок на skill: імʼя, двокрапка, опис. Саме за цим рядком модель вирішуватиме, чи потрібна їй повна інструкція.
-
 У `news` заміни рядок `context: projectContext,` на:
 
 ```ts
-  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
+  context: [projectContext, skillCatalog()].join('\n\n'),
 ```
 
-Каталог стає ще одним блоком першого повідомлення, між правилами і `<task>`. Як і `AGENTS.md`, це тексти проєкту.
+Контекст тепер це список блоків: правила проєкту, потім каталог skills. Порожній рядок між ними такий самий, як між блоками в `loadContext`. Щоб додати ще один блок, досить дописати його в масив.
 
-### 4. Правило в system
+### 6. Правило в system
 
 У масиві `system` під рядком `'Context: …'` додай:
 
@@ -147,7 +171,7 @@ const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).
 
 Без цього рядка модель бачить каталог, але не знає, що з ним робити, і часто просто береться до роботи. Слово «only» важливе: без нього модель читала б skill навіть на просте питання. Це правило про поведінку агента, тож воно йде в `system`.
 
-### 5. Тул і його виконання
+### 7. Тул і його виконання
 
 У `news.tools` після тула `saveDigest` додай опис:
 
@@ -222,7 +246,7 @@ npm start -- "Склади дайджест: знайди одне обгово�
 - Немає `readSkill` на дайджесті: перевір рядок `Skills:` у `system` і блок `<skills>` у першому повідомленні (`TRACE=1`). Модель може помилитися; переформулюй задачу ближче до опису або попроси прямо: «прочитай skill digest і склади дайджест».
 - `readSkill` на питанні про tool calling: у рядку `Skills:` загубилось слово «only».
 - `Невідомий skill`: модель передала шлях чи іншу назву. Імʼя має збігатися з назвою папки, `digest`.
-- Повний текст видно вже в першому запиті: у `context` потрапив `skill.text` замість `descriptions`.
+- Повний текст видно вже в першому запиті: у `skillCatalog` потрапив `skill.text` замість `skill.description`.
 
 **Збережи свою зміну:**
 
@@ -255,10 +279,46 @@ npm test -- --test-name-pattern "^(0[0-8]|08b|1[01]) "
 Очікуваний вміст змінених файлів після теми. Інші файли залишаються без змін.
 
 <details>
+<summary>src/context.ts</summary>
+
+```ts
+import { readFileSync, readdirSync } from 'node:fs';
+
+// Загортаємо текст у тег з назвою файла: модель бачить, де межі й звідки кожна частина.
+export function section(tag: string, source: string, text: string) {
+  return `<${tag} source="${source}">\n${text.trim()}\n</${tag}>`;
+}
+
+// Читаємо лише підготовлені інструкції нашого проєкту.
+export function loadContext(root = new URL('../', import.meta.url)) {
+  const agentsFile = new URL('AGENTS.md', root);
+  const parts = [section('project', 'AGENTS.md', readFileSync(agentsFile, 'utf8'))];
+  const rulesDirectory = new URL('rules/', root);
+
+  // Стабільний порядок дає однаковий контекст за однакових файлів.
+  const files = readdirSync(rulesDirectory, { withFileTypes: true })
+    .filter(file => file.isFile() && file.name.endsWith('.md'))
+    .map(file => file.name)
+    .sort();
+
+  for (const name of files) {
+    const file = new URL(encodeURIComponent(name), rulesDirectory);
+    const text = readFileSync(file, 'utf8');
+    parts.push(section('rule', `rules/${name}`, text));
+  }
+
+  return parts.join('\n\n');
+}
+```
+
+</details>
+
+<details>
 <summary>src/skills.ts</summary>
 
 ```ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { section } from './context.ts';
 
 // Спершу віддаємо назву й опис. Повний текст модель читає окремим тулом.
 const directory = new URL('../skills/', import.meta.url);
@@ -285,6 +345,12 @@ export function readSkill(name: string) {
   }
   return skill.text;
 }
+
+// Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
+export function skillCatalog() {
+  const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
+  return section('skills', 'skills/', lines.join('\n'));
+}
 ```
 
 </details>
@@ -299,7 +365,7 @@ import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
 import { loadContext } from '../context.ts';
-import { skills, readSkill } from '../skills.ts';
+import { readSkill, skillCatalog } from '../skills.ts';
 
 const maxQueryCharacters = 120;
 const maxSearchDays = 30;
@@ -322,7 +388,6 @@ const skillInput = z.object({
   name: z.string(),
 });
 const projectContext = loadContext();
-const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
 const system = [
@@ -342,7 +407,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
+  context: [projectContext, skillCatalog()].join('\n\n'),
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {

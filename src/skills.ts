@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { section } from './context.ts';
 
 // Спершу віддаємо назву й опис. Повний текст модель читає окремим тулом.
 const directory = new URL('../skills/', import.meta.url);
@@ -24,4 +25,10 @@ export function readSkill(name: string) {
     throw new Error(`Невідомий skill: ${name}`);
   }
   return skill.text;
+}
+
+// Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
+export function skillCatalog() {
+  const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
+  return section('skills', 'skills/', lines.join('\n'));
 }

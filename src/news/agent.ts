@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
 import { loadContext } from '../context.ts';
-import { skills, readSkill } from '../skills.ts';
+import { readSkill, skillCatalog } from '../skills.ts';
 
 const maxQueryCharacters = 120;
 const maxSearchDays = 30;
@@ -27,7 +27,6 @@ const skillInput = z.object({
   name: z.string(),
 });
 const projectContext = loadContext();
-const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
 const system = [
@@ -47,7 +46,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
+  context: [projectContext, skillCatalog()].join('\n\n'),
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
