@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 
 // Загортаємо текст у тег з назвою файла: модель бачить, де межі й звідки кожна частина.
-function section(tag: string, source: string, text: string) {
+export function section(tag: string, source: string, text: string) {
   return `<${tag} source="${source}">\n${text.trim()}\n</${tag}>`;
 }
 
