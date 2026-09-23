@@ -1,8 +1,8 @@
 # 10. Контекст: AGENTS.md і rules
 
-[Усі теми](README.md) · [Попередня](08b-limits.md) · [Наступна](11-skills.md)
+[Усі теми](README.md) · [Попередня](09-retry.md) · [Наступна](11-skills.md)
 
-**Перед початком:** код із гілки `step-08b-limits`. **Результат теми:** `step-10-context`. Файли `AGENTS.md` і `rules/sources.md` уже підготовлені. Пишемо лише код у `src/`.
+**Перед початком:** код із гілки `step-09-retry`. **Результат теми:** `step-10-context`. Файли `AGENTS.md` і `rules/sources.md` уже підготовлені. Пишемо лише код у `src/`.
 
 ## Що робимо й навіщо
 
@@ -191,7 +191,7 @@ Claude Code завантажує `CLAUDE.md` з робочої теки й ба�
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-8]|08b|10) "
+npm test -- --test-name-pattern "^(0[0-9]|10) "
 TRACE=1 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
@@ -224,7 +224,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 10"
 git fetch origin
 git switch -c work-11 origin/step-10-context
 npm run check
-npm test -- --test-name-pattern "^(0[0-8]|08b|10) "
+npm test -- --test-name-pattern "^(0[0-9]|10) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-11 вже існує, обери нове імʼя, наприклад work-11-retry. .env і node_modules залишаються на місці. Відкрий [ранбук 11](11-skills.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
