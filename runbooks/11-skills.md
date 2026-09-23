@@ -205,7 +205,7 @@ const skillInput = z.object({
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-8]|08b|1[01]) "
+npm test -- --test-name-pattern "^(0[0-9]|1[01]) "
 ```
 
 **Автоматична перевірка:** 30 тестів без мережі. Тест `11 Skills` дивиться, що в першому запиті є `<skills>` з описом, але немає тексту інструкції, а в другому, після `readSkill`, інструкція вже є. Він також перевіряє, що `readSkill('../../.env')` дає помилку.
@@ -276,7 +276,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 11"
 git fetch origin
 git switch -c work-12 origin/step-11-skills
 npm run check
-npm test -- --test-name-pattern "^(0[0-8]|08b|1[01]) "
+npm test -- --test-name-pattern "^(0[0-9]|1[01]) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-12 вже існує, обери нове імʼя, наприклад work-12-retry. .env і node_modules залишаються на місці. Відкрий [ранбук 12](12-guard.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.

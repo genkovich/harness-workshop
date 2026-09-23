@@ -46,14 +46,14 @@ jobs:
             pattern: "^0[0-7] "
           - ref: step-08-loop
             pattern: "^0[0-8] "
-          - ref: step-08b-limits
-            pattern: "^(0[0-8]|08b) "
+          - ref: step-09-retry
+            pattern: "^0[0-9] "
           - ref: step-10-context
-            pattern: "^(0[0-8]|08b|10) "
+            pattern: "^(0[0-9]|10) "
           - ref: step-11-skills
-            pattern: "^(0[0-8]|08b|1[01]) "
+            pattern: "^(0[0-9]|1[01]) "
           - ref: step-12-guard
-            pattern: "^(0[0-8]|08b|1[0-2]) "
+            pattern: "^(0[0-9]|1[0-2]) "
     steps:
       - uses: actions/checkout@v4
         with:
