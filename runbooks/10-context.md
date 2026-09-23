@@ -1,8 +1,8 @@
 # 10. Контекст: AGENTS.md і rules
 
-[Усі теми](README.md) · [Попередня](09-description.md) · [Наступна](11-skills.md)
+[Усі теми](README.md) · [Попередня](08b-limits.md) · [Наступна](11-skills.md)
 
-**Перед початком:** код із гілки `step-09-description`. **Результат теми:** `step-10-context`. Файли `AGENTS.md` і `rules/sources.md` уже підготовлені. Пишемо лише код у `src/`.
+**Перед початком:** код із гілки `step-08b-limits`. **Результат теми:** `step-10-context`. Файли `AGENTS.md` і `rules/sources.md` уже підготовлені. Пишемо лише код у `src/`.
 
 ## Що робимо й навіщо
 
@@ -23,12 +23,6 @@
 Зараз правила є на диску, але модель їх не бачить. Спочатку прочитаємо `AGENTS.md`, потім додамо всі Markdown-файли з `rules/`. Побачимо їх у першому запиті через `TRACE=1`.
 
 ## Маленькі зміни
-
-Поверни звичайний опис `saveDigest` після попереднього експерименту:
-
-```ts
-description: 'Save the Ukrainian digest with source links to .data/digest.md, replacing the previous digest.',
-```
 
 ### 1. Читаємо AGENTS.md
 
@@ -131,11 +125,11 @@ const messages: ModelMessage[] = [
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|08b|10) "
+npm test -- --test-name-pattern "^(0[0-8]|08b|10) "
 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 30 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 29 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** тексти AGENTS.md і rules/sources.md є в першому user-повідомленні, а роль агента залишилась у system. Його дотримання перевіряємо окремо у відповіді моделі через API.
 
@@ -160,7 +154,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 10"
 git fetch origin
 git switch -c work-11 origin/step-10-context
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|08b|10) "
+npm test -- --test-name-pattern "^(0[0-8]|08b|10) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-11 вже існує, обери нове імʼя, наприклад work-11-retry. .env і node_modules залишаються на місці. Відкрий [ранбук 11](11-skills.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
