@@ -31,8 +31,8 @@ test('00 Підготовка: команда prepare створює .env і з�
 
 test('00 Ранбуки: усі теми, локальні посилання, пояснення, перевірки та готовий код доступні', async () => {
   const folder = join(root, 'runbooks');
-  const files = (await readdir(folder)).filter(file => /^\d\d(?:b)?-.*\.md$/.test(file)).sort();
-  const stages = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '08b', '10', '11', '12'];
+  const files = (await readdir(folder)).filter(file => /^\d\d-.*\.md$/.test(file)).sort();
+  const stages = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
   assert.equal(files.length, stages.length);
   for (const [index, file] of files.entries()) {
     assert.equal(file.split('-')[0], stages[index]);
