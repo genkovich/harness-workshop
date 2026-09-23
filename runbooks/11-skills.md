@@ -16,16 +16,19 @@ Skill це окрема інструкція для одного типу зад
 |---|---|---|
 | Назва й опис skill (рядок `description:` з `SKILL.md`) | перше `user`, блок `<skills>` | Завжди. Опис каже, що робить skill і коли його читати: «Читай перед будь-яким пошуком обговорень» |
 | Повний текст `SKILL.md` | результат тула `readSkill`, повідомлення `tool` в історії | Лише після того, як модель викликала `readSkill` |
-| Правило, як користуватися skills | рядок `Skills:` у `system` | Завжди. Це поведінка агента, тож місце в коді агента |
+| Загальне правило «як користуватися skills» | рядок `Skills:` у `system` | Завжди. Це поведінка агента, про конкретні тули й skills воно не знає |
+| Нагадування прямо над списком | перший рядок блоку `<skills>` | Завжди. Стоїть поруч з описами, тож модель не пропускає його |
+| Коли читати конкретний skill | кінець його `description` у `SKILL.md` | Завжди, разом з описом: «Читай перед будь-яким пошуком обговорень» |
 | Тул `readSkill` | поле `tools` | Завжди. Приймає лише імʼя зі списку, не шлях до файла |
 
 ### Як виглядатиме запит
 
 ```text
 Запит 1
-  system     … Skills: before the first searchStories call, call readSkill for the <skills> entry …
+  system     … Skills: start every task by checking <skills>. If a description matches the task, call readSkill …
   user       <project …> <rule …>
              <skills source="skills/">
+             Before working on a task that matches one of these skills, call readSkill with its name.
              digest: Як шукати, відбирати й переказувати обговорення HN про harness engineering і coding agents. Читай перед будь-яким пошуком обговорень.
              </skills>
              <task> Склади дайджест: … </task>
@@ -116,12 +119,15 @@ export function readSkill(name: string) {
 ```ts
 // Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
 export function skillCatalog() {
+  const header = 'Before working on a task that matches one of these skills, call readSkill with its name.';
   const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
-  return section('skills', 'skills/', lines.join('\n'));
+  return section('skills', 'skills/', [header, ...lines].join('\n'));
 }
 ```
 
-Один рядок на skill: імʼя, двокрапка, опис. Саме за цим рядком модель вирішуватиме, чи потрібна їй повна інструкція. Поля `text` тут немає, тож повний текст у контекст не потрапить.
+Перший рядок блоку це нагадування, що робити зі списком. Далі по рядку на skill: імʼя, двокрапка, опис. За описом модель вирішує, чи потрібна їй повна інструкція. Поля `text` тут немає, тож повний текст у контекст не потрапить.
+
+Навіщо нагадування тут, якщо є рядок у `system`? Ми перевірили на `gpt-4.1-mini`: з правилом лише в `system` модель не прочитала skill у жодній з чотирьох задач, одразу йшла шукати. Коли той самий зміст стоїть прямо над списком, `readSkill` зʼявився першим у шести задачах із шести. Інструкція поруч із даними, до яких вона стосується, працює краще за інструкцію в іншому кінці запиту. Так само робить Flue: список skills і пояснення, що з ним робити, у нього йдуть одним блоком.
 
 Перевір каталог окремо від моделі:
 
@@ -133,6 +139,7 @@ node --import tsx --input-type=module -e "import { skillCatalog } from './src/sk
 
 ```text
 <skills source="skills/">
+Before working on a task that matches one of these skills, call readSkill with its name.
 digest: Як шукати, відбирати й переказувати обговорення HN про harness engineering і coding agents. Читай перед будь-яким пошуком обговорень.
 </skills>
 ```
@@ -166,10 +173,10 @@ const skillInput = z.object({
 У масиві `system` під рядком `'Context: …'` додай:
 
 ```ts
-  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
+  'Skills: start every task by checking <skills>. If a description matches the task, call readSkill with that name before any other tool, then follow it.',
 ```
 
-Без цього рядка модель бачить каталог, але не знає, що з ним робити, і часто одразу береться шукати. Правило привʼязане до конкретної дії: перед першим `searchStories`. Розмите «читай skill, коли він потрібен» слабші моделі пропускають: `gpt-4.1-mini` у наших прогонах жодного разу не викликав `readSkill`. Конкретний момент модель виконує стабільно, а задача без пошуку skill не зачепить. Це правило про поведінку агента, тож воно йде в `system`.
+Правило загальне: у ньому немає ні назви skill, ні назв тулів. Воно каже лише, що робити з каталогом: на старті задачі переглянути його і прочитати skill раніше за будь-який інший тул. **Коли** саме потрібен конкретний skill, каже його власний опис: у `digest` це «Читай перед будь-яким пошуком обговорень». Додаси новий skill чи тул, і `system` міняти не доведеться. Це правило про поведінку агента, тож воно йде в `system`.
 
 ### 7. Тул і його виконання
 
@@ -178,7 +185,7 @@ const skillInput = z.object({
 ```ts
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it first when a skill matches the task.',
       inputSchema: skillInput,
     }),
 ```
@@ -208,10 +215,12 @@ npm test -- --test-name-pattern "^(0[0-8]|08b|1[01]) "
 Спершу задача, якій skill не потрібен:
 
 ```bash
-npm start -- "Поясни одним реченням, що таке tool calling. Нічого не шукай."
+npm start -- "Скільки буде 17 × 23? Відповідай лише числом."
 ```
 
-У журналі один крок і жодного `readSkill`: модель відповіла одразу. Опис skill був у запиті, але повний текст так і лишився на диску.
+У журналі один крок і жодного `readSkill`: задача не має нічого спільного з описом skill, тож модель відповіла одразу. Повний текст skill так і лишився на диску.
+
+На питання, близьке до теми, наприклад «що таке tool calling», модель може прочитати skill: вона вирішила, що опис підходить. Модель так вирішила за описом, і це нормально.
 
 Тепер задача, яка пасує до опису:
 
@@ -243,8 +252,8 @@ npm start -- "Склади дайджест: знайди одне обгово�
 
 **Якщо не так:**
 
-- Немає `readSkill` на дайджесті: перевір рядок `Skills:` у `system` і блок `<skills>` у першому повідомленні (`TRACE=1`). Модель може помилитися; переформулюй задачу ближче до опису або попроси прямо: «прочитай skill digest і склади дайджест».
-- `readSkill` на питанні про tool calling: модель вирішила шукати. Перевір, що в задачі є «Нічого не шукай».
+- Немає `readSkill` на дайджесті: перевір у `TRACE=1`, що в першому повідомленні блок `<skills>` починається з рядка «Before working on a task…», а в `system` є рядок `Skills:`. Якщо модель однаково пропускає skill, уточни в `SKILL.md`, коли його читати.
+- `readSkill` на задачі, не повʼязаній з темою: опис skill надто широкий. Звузь `description` у `SKILL.md`.
 - `Невідомий skill`: модель передала шлях чи іншу назву. Імʼя має збігатися з назвою папки, `digest`.
 - Повний текст видно вже в першому запиті: у `skillCatalog` потрапив `skill.text` замість `skill.description`.
 
@@ -348,8 +357,9 @@ export function readSkill(name: string) {
 
 // Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
 export function skillCatalog() {
+  const header = 'Before working on a task that matches one of these skills, call readSkill with its name.';
   const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
-  return section('skills', 'skills/', lines.join('\n'));
+  return section('skills', 'skills/', [header, ...lines].join('\n'));
 }
 ```
 
@@ -400,7 +410,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
-  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
+  'Skills: start every task by checking <skills>. If a description matches the task, call readSkill with that name before any other tool, then follow it.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
@@ -428,7 +438,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it first when a skill matches the task.',
       inputSchema: skillInput,
     }),
   },
