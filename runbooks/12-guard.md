@@ -57,7 +57,7 @@ import { loadSettings } from '../settings.ts';
 
 ```ts
 beforeTool(name: string) {
-    const settings = loadSettings();
+  const settings = loadSettings();
   if (name === 'saveDigest' && !settings.permissions.saveDigest) {
     return 'blocked, ask the user';
   }
