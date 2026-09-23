@@ -14,7 +14,7 @@ Skill це окрема інструкція для одного типу зад
 
 | Що | Де в запиті | Коли модель це бачить |
 |---|---|---|
-| Назва й опис skill (рядок `description:` з `SKILL.md`) | перше `user`, блок `<skills>` | Завжди. За описом модель вирішує, чи потрібен skill |
+| Назва й опис skill (рядок `description:` з `SKILL.md`) | перше `user`, блок `<skills>` | Завжди. Опис каже, що робить skill і коли його читати: «Читай перед будь-яким пошуком обговорень» |
 | Повний текст `SKILL.md` | результат тула `readSkill`, повідомлення `tool` в історії | Лише після того, як модель викликала `readSkill` |
 | Правило, як користуватися skills | рядок `Skills:` у `system` | Завжди. Це поведінка агента, тож місце в коді агента |
 | Тул `readSkill` | поле `tools` | Завжди. Приймає лише імʼя зі списку, не шлях до файла |
@@ -23,10 +23,10 @@ Skill це окрема інструкція для одного типу зад
 
 ```text
 Запит 1
-  system     … Skills: only when the task needs what a <skills> entry describes, call readSkill …
+  system     … Skills: before the first searchStories call, call readSkill for the <skills> entry …
   user       <project …> <rule …>
              <skills source="skills/">
-             digest: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
+             digest: Як шукати, відбирати й переказувати обговорення HN про harness engineering і coding agents. Читай перед будь-яким пошуком обговорень.
              </skills>
              <task> Склади дайджест: … </task>
   ← модель відповідає: readSkill { name: "digest" }
@@ -133,7 +133,7 @@ node --import tsx --input-type=module -e "import { skillCatalog } from './src/sk
 
 ```text
 <skills source="skills/">
-digest: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
+digest: Як шукати, відбирати й переказувати обговорення HN про harness engineering і coding agents. Читай перед будь-яким пошуком обговорень.
 </skills>
 ```
 
@@ -166,10 +166,10 @@ const skillInput = z.object({
 У масиві `system` під рядком `'Context: …'` додай:
 
 ```ts
-  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
+  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
 ```
 
-Без цього рядка модель бачить каталог, але не знає, що з ним робити, і часто просто береться до роботи. Слово «only» важливе: без нього модель читала б skill навіть на просте питання. Це правило про поведінку агента, тож воно йде в `system`.
+Без цього рядка модель бачить каталог, але не знає, що з ним робити, і часто одразу береться шукати. Правило привʼязане до конкретної дії: перед першим `searchStories`. Розмите «читай skill, коли він потрібен» слабші моделі пропускають: `gpt-4.1-mini` у наших прогонах жодного разу не викликав `readSkill`. Конкретний момент модель виконує стабільно, а задача без пошуку skill не зачепить. Це правило про поведінку агента, тож воно йде в `system`.
 
 ### 7. Тул і його виконання
 
@@ -178,7 +178,7 @@ const skillInput = z.object({
 ```ts
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
       inputSchema: skillInput,
     }),
 ```
@@ -244,7 +244,7 @@ npm start -- "Склади дайджест: знайди одне обгово�
 **Якщо не так:**
 
 - Немає `readSkill` на дайджесті: перевір рядок `Skills:` у `system` і блок `<skills>` у першому повідомленні (`TRACE=1`). Модель може помилитися; переформулюй задачу ближче до опису або попроси прямо: «прочитай skill digest і склади дайджест».
-- `readSkill` на питанні про tool calling: у рядку `Skills:` загубилось слово «only».
+- `readSkill` на питанні про tool calling: модель вирішила шукати. Перевір, що в задачі є «Нічого не шукай».
 - `Невідомий skill`: модель передала шлях чи іншу назву. Імʼя має збігатися з назвою папки, `digest`.
 - Повний текст видно вже в першому запиті: у `skillCatalog` потрапив `skill.text` замість `skill.description`.
 
@@ -400,7 +400,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
-  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
+  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
@@ -428,7 +428,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
       inputSchema: skillInput,
     }),
   },
