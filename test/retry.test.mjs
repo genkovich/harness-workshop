@@ -22,7 +22,7 @@ const limited = (message, responseHeaders, statusCode = 429) => new APICallError
   requestBodyValues: {},
 });
 
-test('08b API: тимчасові 429 і 503 повторюються без повторного виконання дії', async t => {
+test('09 API: тимчасові 429 і 503 повторюються без повторного виконання дії', async t => {
   const { runAgent } = await import('../src/harness.ts');
   const waits = [];
   t.mock.method(globalThis, 'setTimeout', (callback, milliseconds) => {
@@ -89,7 +89,7 @@ test('08b API: тимчасові 429 і 503 повторюються без п�
 });
 
 
-test('08b Дані: повтори запиту не змінюють пошук і перехід між порціями', async t => {
+test('09 Дані: повтори запиту не змінюють пошук і перехід між порціями', async t => {
   const { searchStories, readDiscussion } = await import('../src/news/api.ts');
   const { news } = await import('../src/news/agent.ts');
   const hits = Array.from({ length: 12 }, (_, i) => ({
