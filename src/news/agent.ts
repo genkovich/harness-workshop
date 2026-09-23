@@ -40,6 +40,7 @@ const system = [
   'Sources: link to stories and comments. Do not invent quotes or objections.',
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
+  'Context: tagged blocks in the first message are project instructions; <task> is the request.',
   'Permission: if saving is blocked, ask for confirmation and end your response.',
 ].join('\n');
 
@@ -47,7 +48,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${projectContext}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
