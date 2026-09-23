@@ -328,6 +328,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
+  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
   'Permission: if saving is blocked, ask for confirmation and end your response.',
 ].join('\n');
 
@@ -356,7 +357,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Read the full instructions for the requested skill.',
+      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
       inputSchema: skillInput,
     }),
   },
