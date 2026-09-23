@@ -97,11 +97,11 @@ APPROVED=1 npm start -- "Знайди одне обговорення про cod
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|08b|1[0-2]) "
+npm test -- --test-name-pattern "^(0[0-8]|08b|1[0-2]) "
 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 34 тести без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 33 тести без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** без дозволу saveDigest повертає blocked і не змінює digest.md. Дозволений виклик створює файл або замінює попередній дайджест. Якщо файл існував до забороненого запуску, він має лишитися незмінним.
 
@@ -126,7 +126,7 @@ git diff --cached --quiet || git commit -m "Моя спроба етапу 12"
 git fetch origin
 git switch -c work-finished origin/step-12-guard
 npm run check
-npm test -- --test-name-pattern "^(0[0-9]|08b|1[0-2]) "
+npm test -- --test-name-pattern "^(0[0-8]|08b|1[0-2]) "
 ```
 
 Власний коміт залишився у попередній гілці. Якщо work-finished вже існує, обери нове імʼя, наприклад work-finished-retry. .env і node_modules залишаються на місці. Відкрий [завершений маршрут](README.md) в тому самому редакторі: усі ранбуки й тести доступні в кожній гілці.
