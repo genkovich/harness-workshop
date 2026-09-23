@@ -3,7 +3,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
-import { readFileSync } from 'node:fs';
+import { loadContext } from '../context.ts';
+import { loadSettings } from '../settings.ts';
 import { skills, readSkill } from '../skills.ts';
 
 const maxQueryCharacters = 120;
@@ -26,7 +27,7 @@ const digestInput = z.object({
 const skillInput = z.object({
   name: z.string(),
 });
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
+const projectContext = loadContext();
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
@@ -46,7 +47,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${rules}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\nSkills:\n${descriptions}`,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
@@ -98,7 +99,8 @@ export const news = {
   },
 
   beforeTool(name: string) {
-    if (name === 'saveDigest' && process.env.APPROVED !== '1') {
+    const settings = loadSettings();
+    if (name === 'saveDigest' && !settings.permissions.saveDigest) {
       return 'blocked, ask the user';
     }
     return null;
