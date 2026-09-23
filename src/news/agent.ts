@@ -34,6 +34,7 @@ const system = [
   'Sources: link to stories and comments. Do not invent quotes or objections.',
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
+  'Context: tagged blocks in the first message are project instructions; <task> is the request.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
