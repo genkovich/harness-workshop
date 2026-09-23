@@ -22,7 +22,7 @@ const limited = (message, responseHeaders, statusCode = 429) => new APICallError
   requestBodyValues: {},
 });
 
-test('08b Groq 429: пауза зберігає історію, не повторює дію й має межу', async t => {
+test('08b API: тимчасові 429 і 503 повторюються без повторного виконання дії', async t => {
   const { runAgent } = await import('../src/harness.ts');
   const waits = [];
   t.mock.method(globalThis, 'setTimeout', (callback, milliseconds) => {
@@ -36,7 +36,7 @@ test('08b Groq 429: пауза зберігає історію, не повто�
     runTool: async () => ({ saved: true }),
   });
 
-  for (const headers of [undefined, { 'retry-after': '21' }]) {
+  for (const [statusCode, headers] of [[429, undefined], [429, { 'retry-after': '21' }], [503, undefined]]) {
     waits.length = 0;
     const requests = [];
     let executions = 0;
@@ -46,7 +46,7 @@ test('08b Groq 429: пауза зберігає історію, не повто�
         return response([{ type: 'tool-call', toolCallId: 'save-1', toolName: 'save', input: '{}' }]);
       }
       if (requests.length === 2) {
-        throw limited('Rate limit reached on ITPM: Limit 7000, Used 3537, Requested 5834. Please try again in 20.322857142s.', headers);
+        throw limited('Тимчасово неможливо виконати запит', headers, statusCode);
       }
       return final;
     } });
@@ -62,6 +62,8 @@ test('08b Groq 429: пауза зберігає історію, не повто�
 
   for (const error of [
     limited('Invalid key', { 'retry-after': '1' }, 401),
+    limited('Invalid request', undefined, 400),
+    limited('Forbidden', undefined, 403),
     new DOMException('Скасовано', 'AbortError'),
   ]) {
     waits.length = 0;
