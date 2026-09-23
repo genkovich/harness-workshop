@@ -214,7 +214,7 @@ test("11 Skills: Спершу опис skill, повний текст лише �
   });
   await runAgent(await agent({ model }), "Прочитай digest");
   assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /<skills source=\\"skills\/\\">\\ndigest: /);
-  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Skills: only when the task needs/);
+  assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /Skills: before the first searchStories call/);
   assert.doesNotMatch(
     JSON.stringify(model.doGenerateCalls[0].prompt),
     /Для пошуку спробуй англомовні запити/

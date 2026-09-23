@@ -1,6 +1,6 @@
 ---
 name: digest
-description: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
+description: Як шукати, відбирати й переказувати обговорення HN про harness engineering і coding agents. Читай перед будь-яким пошуком обговорень.
 ---
 Для пошуку спробуй англомовні запити harness engineering, coding agents або tool calling.
 Відбирай до трьох дискусій, у яких є змістовні коментарі про інструменти, контекст, цикл чи перевірку.
