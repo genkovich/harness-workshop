@@ -327,7 +327,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
-  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
+  'Skills: start every task by checking <skills>. If a description matches the task, call readSkill with that name before any other tool, then follow it.',
   'Permission: if saving is blocked, ask for confirmation and end your response.',
 ].join('\n');
 
@@ -356,7 +356,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it first when a skill matches the task.',
       inputSchema: skillInput,
     }),
   },
