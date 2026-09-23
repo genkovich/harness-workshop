@@ -1,69 +1,111 @@
-# 10. Правила з файла
+# 10. Контекст: AGENTS.md і rules
 
 [Усі теми](README.md) · [Попередня](09-description.md) · [Наступна](11-skills.md)
 
-**Перед початком:** код із гілки `step-09-description`. **Результат теми:** `step-10-context`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-09-description`. **Результат теми:** `step-10-context`. Файли `AGENTS.md` і `rules/sources.md` уже підготовлені. Пишемо лише код у `src/`.
 
 ## Що робимо й навіщо
 
-Читаємо підготовлений AGENTS.md і додаємо правила перед завданням. Файл потрапляє в контекст лише тому, що наш код його прочитав і передав.
+Контекст — усе, що модель отримала в конкретному запиті: інструкції, завдання, описи тулів і історія. Файл на диску ще не є контекстом. Додамо код, який читає `AGENTS.md` та файли `rules/*.md` і передає їхній текст моделі.
 
-### Для чого node:fs
+`AGENTS.md` містить загальні правила проєкту. У `rules/sources.md` окремо описано роботу з джерелами: показувати розбіжності між коментарями, відділяти думку автора від власної інтерпретації й повідомляти про брак даних. Rules тут — звичайні Markdown-файли. Це наш простий формат, не автоматична підтримка всіх форматів Claude Code чи інших харнесів.
 
-`readFileSync` — вбудована функція Node.js для читання файла. Тут читаємо маленький файл один раз під час запуску. `new URL(..., import.meta.url)` знаходить його відносно поточного модуля.
+### Де саме ці тексти будуть у запиті
+
+- `system` — роль і загальна поведінка агента з `src/news/agent.ts`.
+- перше `user` — прочитані інструкції проєкту, потім завдання з CLI;
+- наступні `assistant` і `tool` — виклики й результати роботи.
+
+Назва `AGENTS.md` не призначає файлу роль `system`. У нашій практиці роль визначає код, який складає `messages`. Правила спрямовують модель, але не блокують виконання функції: guard додамо окремо.
 
 ## Чого бракує зараз і що зміниться
 
-Правила лежать у файлі, але сам файл не входить у запит. Читаємо його й явно додаємо текст перед завданням.
-
-- news.context містить прочитані правила; harness лише додає цей контекст до повідомлення.
-- Правила додаємо на початок повідомлення з роллю `user`. system залишається окремим полем із роллю та загальною поведінкою агента.
-- TRACE і тест показують, чи правило справді передане. Дотримання правила перевіряємо у відповіді моделі окремо.
+Зараз правила є на диску, але модель їх не бачить. Спочатку прочитаємо `AGENTS.md`, потім додамо всі Markdown-файли з `rules/`. Побачимо їх у першому запиті через `TRACE=1`.
 
 ## Маленькі зміни
 
-Спочатку у src/news/agent.ts поверни description saveDigest:
+Поверни звичайний опис `saveDigest` після попереднього експерименту:
 
 ```ts
-// Записує дайджест українською й замінює попередній файл.
 description: 'Save the Ukrainian digest with source links to .data/digest.md, replacing the previous digest.',
 ```
 
-AGENTS.md уже підготовлено. Прочитай файл: у ньому правило починати відповідь словами «Огляд обговорень HN». У src/news/agent.ts додай:
+### 1. Читаємо AGENTS.md
+
+Створи `src/context.ts`:
 
 ```ts
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
+export function loadContext(root = new URL('../', import.meta.url)) {
+  const agentsFile = new URL('AGENTS.md', root);
+  const parts = [readFileSync(agentsFile, 'utf8')];
+
+  return parts.join('\n\n');
+}
 ```
 
-`import.meta.url` — адреса поточного файла `src/news/agent.ts`. Шлях `../../AGENTS.md` піднімається з нього до кореня репозиторію; він не залежить від того, з якої папки викликали команду. `'utf8'` повертає прочитаний текст рядком, а не байтами. Якщо файл відсутній, читання завершиться помилкою до запиту моделі.
+`readFileSync` читає текст із диска. `utf8` означає, що очікуємо рядок, а не байти. `root` знаходиться відносно `src/context.ts`, тому запуск з іншої папки не змінює шлях. `parts` зберігає частини контексту; порожній рядок між ними полегшує читання. `readdirSync` знадобиться наступним кроком.
 
-У news додай поле:
+### 2. Завантажуємо rules
+
+У тій самій функції перед `return` додай:
 
 ```ts
-context: rules,
+const rulesDirectory = new URL('rules/', root);
+const files = readdirSync(rulesDirectory, { withFileTypes: true })
+  .filter(file => file.isFile() && file.name.endsWith('.md'))
+  .map(file => file.name)
+  .sort();
 ```
 
-У тип Agent у src/harness.ts додай:
+`readdirSync` повертає записи папки. Залишаємо тільки файли `.md`; вкладені папки й інші формати пропускаємо. `.sort()` задає сталий порядок за назвою. Немає прихованого пошуку в батьківських каталогах або правил за шаблоном шляху: читаємо лише підготовлену папку `rules/`.
+
+Після цього списку, теж перед `return`, додай:
+
+```ts
+for (const name of files) {
+  const file = new URL(encodeURIComponent(name), rulesDirectory);
+  const text = readFileSync(file, 'utf8');
+  parts.push(`Rule: ${name}\n${text}`);
+}
+```
+
+Для кожної назви читаємо текст і додаємо його до `parts`. `encodeURIComponent` зберігає спеціальні символи назви як частину шляху URL. Підпис `Rule:` показує, звідки взявся текст. Якщо обовʼязкового файла чи папки немає, отримуємо помилку читання до запиту моделі.
+
+### 3. Передаємо текст агенту
+
+У `src/news/agent.ts` додай:
+
+```ts
+import { loadContext } from '../context.ts';
+
+const projectContext = loadContext();
+```
+
+У `news` додай поле:
+
+```ts
+context: projectContext,
+```
+
+### 4. Додаємо контекст у запит
+
+У тип `Agent` у `src/harness.ts` додай:
 
 ```ts
 context?: string;
 ```
 
-У початковому масиві `messages` заміни `content` повідомлення з роллю `user`:
+Початкове повідомлення:
 
 ```ts
-content: `${agent.context || ''}\n${task}`.trim(),
+const messages: ModelMessage[] = [
+  { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
+];
 ```
 
-Шаблонний рядок вставляє контекст і завдання через `${...}`, а `\n` додає перенос рядка. `|| ''` підставляє порожній текст для агента без контексту; `.trim()` прибирає зайві пробіли по краях. Файл не стає особливою системною інструкцією через свою назву: тут ми свідомо передаємо його в user-повідомленні.
-
-Подивись перший запит:
-
-```bash
-TRACE=1 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
-```
+Спочатку йдуть інструкції проєкту, потім задача. `|| ''` дозволяє запускати агента без додаткового контексту. `system: agent.system` у `generateText` залишається окремим полем.
 
 ## Перевірка
 
@@ -73,11 +115,11 @@ npm test -- --test-name-pattern "^(0[0-9]|08b|10) "
 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 29 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 30 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
-**Очікуємо:** правило є в першому user-повідомленні. Його дотримання перевіряємо окремо у відповіді моделі через API.
+**Очікуємо:** тексти AGENTS.md і rules/sources.md є в першому user-повідомленні, а роль агента залишилась у system. Його дотримання перевіряємо окремо у відповіді моделі через API.
 
-**Якщо не так:** Файл є, тексту немає — звір news.context і складання messages. Файл редагувати не потрібно.
+**Якщо не так:** Файл є, тексту немає — перевір loadContext, news.context і складання messages. TRACE доводить передачу тексту; виконання інструкції моделлю оцінюємо окремо.
 
 **Збережи свою зміну:**
 
@@ -250,7 +292,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
-import { readFileSync } from 'node:fs';
+import { loadContext } from '../context.ts';
 
 const maxQueryCharacters = 120;
 const maxSearchDays = 30;
@@ -269,7 +311,7 @@ const discussionInput = z.object({
 const digestInput = z.object({
   text: z.string().trim().min(1).max(maxDigestCharacters),
 });
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
+const projectContext = loadContext();
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
 const system = [
@@ -287,7 +329,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: rules,
+  context: projectContext,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
@@ -333,3 +375,39 @@ export const news = {
 
 </details>
 
+
+<details>
+<summary>src/context.ts</summary>
+
+```ts
+import { readFileSync, readdirSync } from 'node:fs';
+
+// Читаємо лише підготовлені інструкції нашого проєкту.
+export function loadContext(root = new URL('../', import.meta.url)) {
+  const agentsFile = new URL('AGENTS.md', root);
+  const parts = [readFileSync(agentsFile, 'utf8')];
+  const rulesDirectory = new URL('rules/', root);
+
+  // Стабільний порядок дає однаковий контекст за однакових файлів.
+  const files = readdirSync(rulesDirectory, { withFileTypes: true })
+    .filter(file => file.isFile() && file.name.endsWith('.md'))
+    .map(file => file.name)
+    .sort();
+
+  for (const name of files) {
+    const file = new URL(encodeURIComponent(name), rulesDirectory);
+    const text = readFileSync(file, 'utf8');
+    parts.push(`Rule: ${name}\n${text}`);
+  }
+
+  return parts.join('\n\n');
+}
+```
+
+</details>
+
+## Порівняння з Claude Code — лише пояснення
+
+У нашому прикладі loadContext читає AGENTS.md і всі rules/*.md на старті. Вкладений пошук і правила paths не реалізуємо. У Claude Code загальні інструкції завантажуються на початку сесії, а вкладені інструкції та відповідні paths-правила — при читанні файла. Це не правило «всі rules спрацьовують тільки на Edit». Перед виконанням Edit окремо перевіряються дозволи та hooks.
+
+Пряма підтримка AGENTS.md у Claude Code залежить від версії та Project instructions. Для сумісності можна використати CLAUDE.md з імпортом @AGENTS.md. [Поточна документація](https://code.claude.com/docs/en/memory).
