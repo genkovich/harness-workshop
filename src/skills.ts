@@ -29,6 +29,7 @@ export function readSkill(name: string) {
 
 // Блок для першого повідомлення: лише імʼя й опис кожного skill, по рядку.
 export function skillCatalog() {
+  const header = 'Before working on a task that matches one of these skills, call readSkill with its name.';
   const lines = skills.map((skill) => `${skill.name}: ${skill.description}`);
-  return section('skills', 'skills/', lines.join('\n'));
+  return section('skills', 'skills/', [header, ...lines].join('\n'));
 }
