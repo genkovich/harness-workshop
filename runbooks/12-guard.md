@@ -167,10 +167,16 @@ export type Agent = {
   maxSteps?: number;
 };
 
+// Історія починається з одного user-повідомлення: спершу контекст проєкту, в кінці задача.
+// Далі цикл лише дописує відповіді моделі й результати тулів, а цей початок не змінюється.
+function firstMessage(agent: Agent, task: string): ModelMessage {
+  const parts = agent.context ? [agent.context] : [];
+  parts.push(`<task>\n${task}\n</task>`);
+  return { role: 'user', content: parts.join('\n\n') };
+}
+
 export async function runAgent(agent: Agent, task: string) {
-  const messages: ModelMessage[] = [
-    { role: 'user', content: `${agent.context || ''}\n${task}`.trim() },
-  ];
+  const messages: ModelMessage[] = [firstMessage(agent, task)];
 
   for (let step = 1; step <= (agent.maxSteps ?? defaultMaxSteps); step++) {
     console.log(`\nКрок ${step}. Повідомлень у запиті: ${messages.length}.`);
@@ -321,6 +327,7 @@ const system = [
   'Sources: link to stories and comments. Do not invent quotes or objections.',
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
+  'Context: tagged blocks in the first message are project instructions; <task> is the request.',
   'Permission: if saving is blocked, ask for confirmation and end your response.',
 ].join('\n');
 
@@ -328,7 +335,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${projectContext}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
