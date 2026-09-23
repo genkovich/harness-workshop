@@ -2,24 +2,56 @@
 
 [Усі теми](README.md) · [Попередня](10-context.md) · [Наступна](12-guard.md)
 
-**Перед початком:** код із гілки `step-10-context`. **Результат теми:** `step-11-skills`. Змінюємо лише `src/`.
+**Перед початком:** код із гілки `step-10-context`. **Результат теми:** `step-11-skills`. Файл `skills/digest/SKILL.md` уже підготовлений. Пишемо лише код у `src/`.
 
 ## Що робимо й навіщо
 
-Skill — окрема інструкція для певного завдання. Спочатку передаємо моделі лише короткі описи доступних інструкцій. Повна інструкція потрапляє в історію після readSkill: так потрібні деталі додаються на вимогу.
+Skill це окрема інструкція для одного типу задач. Наш `skills/digest/SKILL.md` пояснює, як скласти дайджест: шукати англійською, брати до трьох дискусій, для кожної дати суть і заперечення, наприкінці написати рядок «Межі: …».
+
+Цю інструкцію можна було б покласти в перше повідомлення поруч із `AGENTS.md`. Але тоді вона йшла б у кожен запит, навіть у «привіт». Для однієї інструкції це дрібниця, для двадцяти вже тисячі зайвих токенів у кожному запиті. Тому ділимо skill на дві частини: коротку, яку модель бачить завжди, і повну, яку отримує лише тоді, коли сама попросить.
+
+### Що куди кладемо
+
+| Що | Де в запиті | Коли модель це бачить |
+|---|---|---|
+| Назва й опис skill (рядок `description:` з `SKILL.md`) | перше `user`, блок `<skills>` | Завжди. За описом модель вирішує, чи потрібен skill |
+| Повний текст `SKILL.md` | результат тула `readSkill`, повідомлення `tool` в історії | Лише після того, як модель викликала `readSkill` |
+| Правило, як користуватися skills | рядок `Skills:` у `system` | Завжди. Це поведінка агента, тож місце в коді агента |
+| Тул `readSkill` | поле `tools` | Завжди. Приймає лише імʼя зі списку, не шлях до файла |
+
+### Як виглядатиме запит
+
+```text
+Запит 1
+  system     … Skills: only when the task needs what a <skills> entry describes, call readSkill …
+  user       <project …> <rule …>
+             <skills>
+             digest: Як відібрати дискусії про harness engineering і скласти дайджест із джерелами.
+             </skills>
+             <task> Склади дайджест: … </task>
+  ← модель відповідає: readSkill { name: "digest" }
+
+Запит 2 (усе з запиту 1 плюс)
+  assistant  readSkill { name: "digest" }
+  tool       { text: "---\nname: digest … Для пошуку спробуй англомовні запити … Заверши рядком «Межі: …»" }
+  ← модель відповідає: searchStories { query: "coding agents" }
+```
+
+Зверни увагу: перше повідомлення не змінилось. Повний текст skill дописався в кінець історії так само, як будь-який результат тула. Новий механізм не потребує змін у циклі: `readSkill` це ще один тул.
 
 ## Чого бракує зараз і що зміниться
 
-Довгі інструкції не завжди потрібні для кожного завдання. Спочатку показуємо короткий опис, щоб модель могла обрати потрібну інструкцію, а повний текст повертаємо після запиту readSkill.
+Зараз модель не знає про `SKILL.md`. Після етапу:
 
-- descriptions — каталог доступних інструкцій. Сам повний текст спочатку залишається у нашій програмі.
-- readSkill шукає відоме імʼя в каталозі; модель не отримує довільне читання файлів за шляхом.
-- Новий інструмент використовує вже готовий цикл: його результат так само повертається через messages.
-- Після зміни порівнюємо два запити: до readSkill є опис, після нього — повна інструкція.
+- `src/skills.ts` читає папку `skills/`, дістає з кожного `SKILL.md` опис і повний текст. `readSkill(name)` повертає текст за іменем.
+- `src/news/agent.ts` кладе описи в блок `<skills>`, додає рядок `Skills:` у `system`, тул `readSkill` і його виконання в `runTool`.
+- Цикл у `harness.ts` не змінюється.
 
 ## Маленькі зміни
 
-skills/digest/SKILL.md уже лежить у заготовці. Створи src/skills.ts. Перший фрагмент:
+### 1. Каталог skills
+
+Створи `src/skills.ts`:
 
 ```ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -28,11 +60,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 const directory = new URL('../skills/', import.meta.url);
 ```
 
-`readdirSync` читає назви в папці, `existsSync` перевіряє наявність `SKILL.md`. `.filter(...)` залишає лише записи з таким файлом, `.map(...)` створює обʼєкти `{ name, description, text }`.
+`directory` вказує на папку `skills/` поруч із `src/`, незалежно від того, звідки запущено програму.
 
-Вираз `/^description: (.+)$/m` шукає рядок `description:` у Markdown. `m` дозволяє шукати початок і кінець кожного рядка; `.exec(text)?.[1]` дістає текст після двокрапки або `undefined`, якщо збігу немає. Це просте читання одного рядка, не повний YAML-парсер.
-
-Нижче склади каталог інструкцій. Повний текст читаємо з диска вже зараз, але **моделі його ще не передаємо**:
+Нижче збери каталог. Повний текст читаємо з диска вже зараз, але **моделі його ще не передаємо**:
 
 ```ts
 export const skills = readdirSync(directory)
@@ -50,9 +80,9 @@ export const skills = readdirSync(directory)
   });
 ```
 
-`.find(...)` шукає точний збіг імені в уже зібраному каталозі. Для нашого файла імʼя — `digest`. Невідоме імʼя викликає помилку; шлях на кшталт `../../.env` не використовується для читання диска.
+`readdirSync` дає назви в папці, `.filter` лишає ті, де є `SKILL.md`. Імʼя skill це назва його папки, у нас `digest`. Вираз `/^description: (.+)$/m` шукає рядок `description:`; прапорець `m` дозволяє `^` і `$` працювати для кожного рядка, `?.[1]` дістає текст після двокрапки. Це просте читання одного рядка, повний YAML-парсер нам не потрібен. Без опису модель не зможе обрати skill, тож такий файл одразу дає помилку.
 
-Додай функцію читання за іменем:
+### 2. Читання за іменем
 
 ```ts
 export function readSkill(name: string) {
@@ -65,18 +95,39 @@ export function readSkill(name: string) {
 }
 ```
 
-У src/news/agent.ts додай імпорт і два значення поруч зі схемами:
+Модель передає лише імʼя, і ми шукаємо його в уже зібраному каталозі. Якщо модель спробує `../../.env`, отримає «Невідомий skill», а диск ми не читаємо. Помилку цикл поверне моделі як результат тула, як ми зробили на етапі 06.
+
+Перевір каталог окремо від моделі:
+
+```bash
+node --import tsx --input-type=module -e "import { skills } from './src/skills.ts'; console.log(skills.map(s => s.name + ': ' + s.description));"
+```
+
+Очікуємо один рядок: `digest: Як відібрати дискусії …`.
+
+### 3. Описи skills у контексті
+
+У `src/news/agent.ts` під рядком `import { loadContext } from '../context.ts';` додай:
 
 ```ts
 import { skills, readSkill } from '../skills.ts';
+```
 
+Під схемою `digestInput` додай схему аргументів нового тула:
+
+```ts
 const skillInput = z.object({
   name: z.string(),
 });
+```
+
+Під рядком `const projectContext = loadContext();` склади список описів:
+
+```ts
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 ```
 
-`descriptions` обʼєднує лише імена та короткі описи через перенос рядка. Це підказка моделі, яку інструкцію можна попросити через `readSkill`. Повний `text` повертається в результаті інструмента тільки після вибору skill — так працює поступове додавання контексту в цій практиці.
+Один рядок на skill: імʼя, двокрапка, опис. Саме за цим рядком модель вирішуватиме, чи потрібна їй повна інструкція.
 
 У `news` заміни рядок `context: projectContext,` на:
 
@@ -84,47 +135,101 @@ const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).
   context: `${projectContext}\n\n<skills>\n${descriptions}\n</skills>`,
 ```
 
-Каталог skills стає ще одним блоком першого повідомлення, між правилами і `<task>`. Як і `AGENTS.md`, це тексти проєкту, тож їм місце в першому `user`.
+Каталог стає ще одним блоком першого повідомлення, між правилами і `<task>`. Як і `AGENTS.md`, це тексти проєкту.
 
-У news.tools додай опис:
+### 4. Правило в system
 
-```ts
-readSkill: tool({
-  // Читає докладну інструкцію вибраного skill.
-  description: 'Read the full instructions for the requested skill.',
-  inputSchema: skillInput,
-}),
-```
-
-Перед default у runTool додай виконання:
+У масиві `system` під рядком `'Context: …'` додай:
 
 ```ts
-case 'readSkill': {
-  const { name } = skillInput.parse(input);
-  return { text: readSkill(name) };
-}
+  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
 ```
+
+Без цього рядка модель бачить каталог, але не знає, що з ним робити, і часто просто береться до роботи. Слово «only» важливе: без нього модель читала б skill навіть на просте питання. Це правило про поведінку агента, тож воно йде в `system`.
+
+### 5. Тул і його виконання
+
+У `news.tools` після тула `saveDigest` додай опис:
+
+```ts
+    readSkill: tool({
+      // Читає докладну інструкцію вибраного skill.
+      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
+      inputSchema: skillInput,
+    }),
+```
+
+У `runTool` перед `default:` додай виконання:
+
+```ts
+      case 'readSkill': {
+        const { name } = skillInput.parse(input);
+        return { text: readSkill(name) };
+      }
+```
+
+Результат `{ text }` цикл покладе в історію як повідомлення `tool`. З наступного кроку модель бачить повну інструкцію і діє за нею.
 
 ## Перевірка
 
 ```bash
 npm run check
 npm test -- --test-name-pattern "^(0[0-8]|08b|1[01]) "
-npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 30 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 30 тестів без мережі. Тест `11 Skills` дивиться, що в першому запиті є `<skills>` з описом, але немає тексту інструкції, а в другому, після `readSkill`, інструкція вже є. Він також перевіряє, що `readSkill('../../.env')` дає помилку.
 
-**Очікуємо:** спочатку модель бачить опис; після readSkill — повний текст у результаті інструмента.
+### Побачити skill наживо
 
-**Якщо не так:** Повний текст видно відразу — перевір context. Невідомий skill — передавай імʼя digest, не шлях. Для живої перевірки попроси явно прочитати skill digest.
+Спершу задача, якій skill не потрібен:
+
+```bash
+npm start -- "Поясни одним реченням, що таке tool calling. Нічого не шукай."
+```
+
+У журналі один крок і жодного `readSkill`: модель відповіла одразу. Опис skill був у запиті, але повний текст так і лишився на диску.
+
+Тепер задача, яка пасує до опису:
+
+```bash
+npm start -- "Склади дайджест: знайди одне обговорення про coding agents за останні 7 днів, прочитай одну порцію коментарів і перекажи до 100 слів."
+```
+
+Очікуємо в журналі:
+
+```text
+Крок 1. Повідомлень у запиті: 1.
+Модель просить readSkill: { name: 'digest' }
+Результат readSkill: { text: '---\nname: digest\n…' }
+Крок 2. Повідомлень у запиті: 3.
+Модель просить searchStories: { query: 'coding agents', days: 7 }
+…
+Межі: прочитано лише вибрані коментарі; зовнішні статті не перевірено.
+```
+
+Три ознаки, що skill справді спрацював:
+
+1. `readSkill` викликано на першому кроці, до пошуку.
+2. Запит пошуку англійською. У задачі про мову нічого немає, так каже інструкція skill.
+3. Відповідь закінчується рядком «Межі: …». Цей рядок є лише в `SKILL.md`.
+
+З `TRACE=1` видно й самі запити: у першому є блок `<skills>` з одним рядком опису, у другому в кінці історії лежить повний текст `SKILL.md`.
+
+Може трапитись, що модель без прохання викличе `saveDigest` і перезапише `.data/digest.md`. І в `system`, і в `SKILL.md` сказано зберігати лише на прохання, але це лише текст, код цього не перевіряє. Саме це виправимо на етапі 12.
+
+**Якщо не так:**
+
+- Немає `readSkill` на дайджесті: перевір рядок `Skills:` у `system` і блок `<skills>` у першому повідомленні (`TRACE=1`). Модель може помилитися; переформулюй задачу ближче до опису або попроси прямо: «прочитай skill digest і склади дайджест».
+- `readSkill` на питанні про tool calling: у рядку `Skills:` загубилось слово «only».
+- `Невідомий skill`: модель передала шлях чи іншу назву. Імʼя має збігатися з назвою папки, `digest`.
+- Повний текст видно вже в першому запиті: у `context` потрапив `skill.text` замість `descriptions`.
 
 **Збережи свою зміну:**
 
 ```bash
 git add src
 git diff --cached
-git commit -m "Етап 11: Skills"
+git commit -m "Етап 11: skills на вимогу"
 ```
 
 ## Якщо не встиг: готова гілка й наступна тема
@@ -230,6 +335,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
+  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
@@ -257,7 +363,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Read the full instructions for the requested skill.',
+      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
       inputSchema: skillInput,
     }),
   },
@@ -290,4 +396,3 @@ export const news = {
 ```
 
 </details>
-
