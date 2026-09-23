@@ -1,8 +1,8 @@
-# 08б. Повтор запиту після збою
+# 09. Повтор запиту після збою
 
 [Усі теми](README.md) · [Попередня](08-loop.md) · [Наступна](10-context.md)
 
-**Перед початком:** `step-08-loop`. **Готовий результат:** `step-08b-limits`. Назва гілки історична: тут додаємо retry, окремої вправи про квоти немає. Змінюємо лише `src/harness.ts`.
+**Перед початком:** `step-08-loop`. **Готовий результат:** `step-09-retry`. Змінюємо лише `src/harness.ts`.
 
 ## Що робимо й навіщо
 
@@ -38,7 +38,7 @@ maxRetries: 2,
 Запусти підготовлений тест:
 
 ```bash
-node --import tsx --test --test-reporter=spec --test-name-pattern "^08b API:" test/rate-limit.test.mjs
+node --import tsx --test --test-reporter=spec --test-name-pattern "^09 API:" test/retry.test.mjs
 ```
 
 Тест підміняє API й очікування. Ключ і мережа не потрібні. У терміналі буде, зокрема, такий рядок:
@@ -95,7 +95,7 @@ if (response.status === 503) {
 
 ```bash
 npm run check
-npm test -- --test-name-pattern "^(0[0-8]|08b) "
+npm test -- --test-name-pattern "^0[0-9] "
 ```
 
 Очікуємо **27 успішних тестів без мережі**. Перевіряємо повтори тимчасових 429/503, зупинку для 400/401/403 і скасування, незмінну історію та відсутність повторного виконання тула.
@@ -121,9 +121,9 @@ git commit -m "Дозволити обмежені повтори запиту"
 
 ```bash
 git add src
-git commit -m "Моя спроба етапу 08б"
+git commit -m "Моя спроба етапу 09"
 git fetch origin
-git switch -c work-10 origin/step-08b-limits
+git switch -c work-10 origin/step-09-retry
 ```
 
 Якщо змін для коміту немає, пропусти його. Далі відкрий [контекст: AGENTS.md і rules](10-context.md).
