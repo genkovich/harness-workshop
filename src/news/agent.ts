@@ -39,7 +39,7 @@ const system = [
   'Scope: up to three topics, briefly. Say if fewer are available.',
   'Output: use saveDigest only when the user requests saving.',
   'Context: tagged blocks in the first message are project instructions; <task> is the request.',
-  'Skills: only when the task needs what a <skills> entry describes, call readSkill with its name before other tools.',
+  'Skills: before the first searchStories call, call readSkill for the <skills> entry that matches the task and follow it.',
 ].join('\n');
 
 // Модель, інструкція й тули належать конкретному агенту.
@@ -67,7 +67,7 @@ export const news = {
     }),
     readSkill: tool({
       // Читає докладну інструкцію вибраного skill.
-      description: 'Read the full instructions of a skill listed in <skills>. Pass its name, for example digest.',
+      description: 'Load the full instructions of a skill from <skills> by its name. Call it before searchStories when a skill matches the task.',
       inputSchema: skillInput,
     }),
   },
