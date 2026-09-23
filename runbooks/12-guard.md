@@ -1,4 +1,4 @@
-# 12. Дозвіл
+# 12. Guard: дозвіл із settings
 
 [Усі теми](README.md) · [Попередня](11-skills.md)
 
@@ -12,12 +12,38 @@
 
 Опис і промпт можуть попросити не робити дію, але вибір моделі не є перевіркою дозволу. Додаємо перевірку у `executeTool` перед викликом `agent.runTool`, щоб заборонений запис не відбувся.
 
-- beforeTool перевіряє виклик до дії; APPROVED передаємо через середовище запуску.
+- settings містить налаштування виконання. У нашому прикладі джерело дозволу — APPROVED у середовищі запуску.
+- beforeTool читає settings.permissions.saveDigest й перевіряє виклик до дії. Обʼєкт settings у повідомлення моделі не передаємо.
 - Якщо повернувся текст блокування, виконавець не запускається, а модель отримує помилку як результат інструмента.
 - Правило в system просить пояснити блокування й запитати дозвіл. Воно не замінює перевірку коду.
 - Перевіряємо стан файла: без дозволу файл не змінюється, з дозволом файл містить новий дайджест. Самої фрази моделі «готово» недостатньо.
 
 ## Маленькі зміни
+
+Спочатку створи `src/settings.ts`. Цей модуль перетворює налаштування запуску на зрозумілий обʼєкт дозволів:
+
+```ts
+// Налаштування читає код. У повідомлення моделі цей обʼєкт не додаємо.
+export function loadSettings() {
+  // Лише явне значення 1 дозволяє запис. Відсутнє або інше — забороняє.
+  const allowDigestWrite = process.env.APPROVED === '1';
+
+  return {
+    permissions: {
+      saveDigest: allowDigestWrite,
+    },
+  };
+}
+```
+
+`APPROVED=1` стає `settings.permissions.saveDigest === true`. Якщо значення відсутнє або інше, запис заборонено. Це просте налаштування всього запуску, а не інтерактивне підтвердження кожної дії. Окремий JSON-файл для цієї вправи не потрібен; пізніше джерело налаштувань можна замінити, залишивши перевірку guard.
+
+У `src/news/agent.ts` додай імпорт:
+
+```ts
+import { loadSettings } from '../settings.ts';
+```
+
 
 У `src/news/agent.ts` додай до масиву `system` правило, яке пояснює моделі, що робити в разі блокування:
 
@@ -31,7 +57,8 @@
 
 ```ts
 beforeTool(name: string) {
-  if (name === 'saveDigest' && process.env.APPROVED !== '1') {
+    const settings = loadSettings();
+  if (name === 'saveDigest' && !settings.permissions.saveDigest) {
     return 'blocked, ask the user';
   }
   return null;
@@ -74,7 +101,7 @@ npm test -- --test-name-pattern "^(0[0-9]|08b|1[0-2]) "
 npm start -- "Знайди одне обговорення про coding agents за останні 7 днів. Прочитай одну порцію коментарів і збережи підсумок до 100 слів із посиланням."
 ```
 
-**Автоматична перевірка:** 32 тестів без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
+**Автоматична перевірка:** 34 тести без мережі. Усі тести вже є в [test/harness.test.mjs](../test/harness.test.mjs) та [test/runbooks.test.mjs](../test/runbooks.test.mjs). Число на початку назви тесту відповідає етапу; команда запускає цей і попередні етапи.
 
 **Очікуємо:** без дозволу saveDigest повертає blocked і не змінює digest.md. Дозволений виклик створює файл або замінює попередній дайджест. Якщо файл існував до забороненого запуску, він має лишитися незмінним.
 
@@ -257,7 +284,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { searchStories, readDiscussion } from './api.ts';
-import { readFileSync } from 'node:fs';
+import { loadContext } from '../context.ts';
+import { loadSettings } from '../settings.ts';
 import { skills, readSkill } from '../skills.ts';
 
 const maxQueryCharacters = 120;
@@ -280,7 +308,7 @@ const digestInput = z.object({
 const skillInput = z.object({
   name: z.string(),
 });
-const rules = readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
+const projectContext = loadContext();
 const descriptions = skills.map(skill => `${skill.name}: ${skill.description}`).join('\n');
 
 // Інструкції для моделі англійською; відповідь користувачу українською.
@@ -300,7 +328,7 @@ const system = [
 export const news = {
   model: groq(process.env.GROQ_MODEL || 'qwen/qwen3.8-27b'),
   system,
-  context: `${rules}\nSkills:\n${descriptions}`,
+  context: `${projectContext}\nSkills:\n${descriptions}`,
 
   // Описи бачить модель; виконання залишається в нашому циклі.
   tools: {
@@ -352,7 +380,8 @@ export const news = {
   },
 
   beforeTool(name: string) {
-    if (name === 'saveDigest' && process.env.APPROVED !== '1') {
+    const settings = loadSettings();
+    if (name === 'saveDigest' && !settings.permissions.saveDigest) {
       return 'blocked, ask the user';
     }
     return null;
@@ -362,3 +391,22 @@ export const news = {
 
 </details>
 
+
+<details>
+<summary>src/settings.ts</summary>
+
+```ts
+// Налаштування читає код. У повідомлення моделі цей обʼєкт не додаємо.
+export function loadSettings() {
+  // Лише явне значення 1 дозволяє запис. Відсутнє або інше — забороняє.
+  const allowDigestWrite = process.env.APPROVED === '1';
+
+  return {
+    permissions: {
+      saveDigest: allowDigestWrite,
+    },
+  };
+}
+```
+
+</details>
